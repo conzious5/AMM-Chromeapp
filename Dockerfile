@@ -9,7 +9,11 @@ COPY server server
 COPY portal portal
 RUN pnpm --filter @amm/server exec prisma generate
 RUN pnpm --filter @amm/server build && pnpm --filter @amm/portal build
-RUN pnpm --filter @amm/server deploy --prod --legacy /app/deploy && cp -R /app/portal/dist /app/deploy/public
+RUN pnpm --filter @amm/server deploy --prod --legacy /app/deploy \
+  && cp -R /app/portal/dist /app/deploy/public \
+  && cp -R /app/server/prisma /app/deploy/prisma \
+  && cd /app/deploy \
+  && node node_modules/prisma/build/index.js generate --schema prisma/schema.prisma
 
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production
