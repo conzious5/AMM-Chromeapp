@@ -7,7 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, native portal/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline through native-auth commit `da95707`. Extension/auth/identity work is described below. |
-| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, local mocks/tests | Implemented through `afc8f45`, with canonical native-auth adapter at `2ebc687`; canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach are untouched. |
+| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, beta package/validation | Canonical `main` merged and extension hardened through `1b75312`; canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach remain unchanged from `main`. |
 | `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented through inbox-intake commit `7bb7d6b`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
@@ -34,7 +34,7 @@ Handoff: `docs/email-extension-integration-handoff.md`.
 - Does not modify canonical server auth, User/Prisma schema, Railway, portal, analytics database, or Meeting Coach.
 - Final beta-validation pass merged canonical `main` through `e06498d`, strengthened only extension-owned auth/API failure handling and tests, prepared the v0.1.0 unpacked distribution/ZIP, and added Cylina's installation guide. Production health and invalid-login behavior are verified. Valid-user authentication and the real Gmail matrix remain blocked on human installation and private sign-in.
 
-Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, and `afc8f45`; final handoff commit `ae97860`.
+Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, `afc8f45`, and beta-validation merge `1b75312`; initial handoff commit `ae97860`.
 
 ### Management portal and native authentication — owner: main / commits `406c5a6`, `2a1b2ca`, `5cf7526`, `da95707`
 
