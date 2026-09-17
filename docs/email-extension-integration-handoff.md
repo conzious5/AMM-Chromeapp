@@ -2,7 +2,7 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery), `2d16e1b` (new-outbound-email coaching capture boundary), `edd37d0` (service-worker-authoritative auth restoration and safe diagnostics), and `06c039d` (generalized inline Reply/Reply All/Forward compose support). Initial handoff: `ae97860`.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery), `2d16e1b` (new-outbound-email coaching capture boundary), `edd37d0` (service-worker-authoritative auth restoration and safe diagnostics), `06c039d` (generalized inline Reply/Reply All/Forward compose support), and `d91aaaf` (v0.1.3 installation/release preparation). Initial handoff: `ae97860`.
 
 ### Email Communication Coaching — extension capture boundary
 
@@ -73,7 +73,7 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 
 ### Beta validation continuation
 
-#### v0.1.3 inline Reply / Reply All / Forward compatibility — release pending
+#### v0.1.3 inline Reply / Reply All / Forward compatibility — published internal beta
 
 - **What was built:** compose discovery now begins with Gmail's real `g_editable="true"` message body and resolves a generalized semantic compose boundary. Standalone New Compose resolves to `role="dialog"`; inline Reply, Reply All, and Forward resolve to `role="region"`. All modes use the same adapter contract for body, subject, sender, recipients, bounded thread context, toolbar anchor, replacement, and Undo.
 - **Root cause:** the content script discovered, initialized, and reconciled only `[role="dialog"]` roots. Gmail's inline response editors are not dialogs, so their valid body and Send-row toolbar never entered the compose lifecycle.
@@ -82,11 +82,12 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - **Draft and recipient safety:** replacement remains limited to content before `.gmail_signature`, `.gmail_quote`, or smart-signature nodes; Undo restores the exact previous body HTML. The adapter exposes recipient getters only—no recipient setter—and retains the existing prohibition on triggering Send.
 - **Automated coverage:** generalized fixtures cover New Compose, Reply, Reply All, and Forward discovery/classification and the shared operation contract; protected signature/quote extraction, duplicate prevention, toolbar reattachment, independent compose state, exact Undo infrastructure, recipient read-only behavior, sender fallback, and absence of Send interaction remain covered. `node --test extension/tests/*.test.cjs` passes 49/49; extension syntax and manifest parsing pass.
 - **Real Gmail validation:** live Chrome inspection confirmed the four DOM modes, their body/subject/recipient shapes, response markers, safe Send-row anchor, and simultaneous standalone + inline compose boundaries. The installed v0.1.2 build still showed controls only in New Compose, as expected. Chrome automation is prohibited from opening `chrome://extensions`, so this branch build could not be loaded into the signed-in browser to certify visible AMM controls, Replace Draft, and Undo in all four modes. Human Load-unpacked retesting remains required.
-- **Version/release:** `extension/manifest.json` is advanced to `0.1.3`. Intended next prerelease is `v0.1.3-beta`, but no ZIP, tag, GitHub release, or existing asset replacement was created. Release remains blocked on the canonical OpenAI structured-output repair described below so live rewriting can be meaningfully tested.
+- **Version/release:** `extension/manifest.json` is `0.1.3`. Immutable GitHub prerelease: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.3-beta`; direct asset: `https://github.com/conzious5/AMM-Chromeapp/releases/download/v0.1.3-beta/AMM-Voice-Beta-v0.1.3.zip`. SHA-256: `330411522f07f72d21223d9645a6daba52675ee401fbf1e2e0b647d7cf6cf195`. The downloaded GitHub asset matched the validated local ZIP byte-for-byte.
 - **Files changed:** `extension/compose-adapter.js`, `extension/content-script.js`, `extension/core.js`, `extension/manifest.json`, `extension/tests/adapters.test.cjs`, and `extension/tests/core.test.cjs`.
 - **Shared systems:** no canonical auth backend, Prisma, migration, Railway, portal, analytics, Meeting Coach, route, or environment-variable changes.
 - **Potential merge conflicts:** extension-owned compose adapter/content script/core/manifest and their tests. No shared-system conflict is introduced.
-- **Remaining work:** merge with the canonical OpenAI fix, build the immutable v0.1.3 package, then run installed-Chrome New Compose/Reply/Reply All/Forward, both-From-address, replacement/Undo, signature/quote, toolbar-rebuild, and multiple-editor testing before publishing.
+- **Release validation:** 49/49 tests passed; all runtime JavaScript passed syntax validation; manifest version, referenced files, and permissions passed MV3 checks; ZIP integrity passed; all 15 packaged runtime files matched feature-branch source bytes; secret scan found zero credentials/secrets and the package contains no tests, fixtures, dev harness, dependencies, Git files, or server source.
+- **Remaining work:** clean-install v0.1.3 and run New Compose/Reply/Reply All/Forward, both-From-address, replacement/Undo, signature/quote, toolbar-rebuild, failure handling, and multiple-editor manual testing. This is manual beta QA, not a backend blocker.
 
 #### v0.1.2 Gmail compose-control lifecycle fix
 
@@ -113,17 +114,16 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - Extension version advanced to `0.1.1`; v0.1.0-beta remains immutable.
 - GitHub prerelease: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.1-beta`; direct asset: `https://github.com/conzious5/AMM-Chromeapp/releases/download/v0.1.1-beta/AMM-Voice-Beta-v0.1.1.zip`.
 
-#### Pending local-auth restoration and live rewrite diagnosis — no release yet
+#### Local-auth restoration and live rewrite diagnosis — resolved in v0.1.3 beta
 
 - The service worker is the only token owner. Options and Gmail continue to use runtime messaging; tokens remain under the identical `accessToken`, `refreshToken`, and `currentUser` keys in `chrome.storage.session`, and no token enters page DOM or content-script state.
-- Pending extension changes restore state from session storage for every protected operation and after service-worker recreation, verify both token presence and a live protected config request before reporting sign-in success, refresh a missing access token when a valid refresh token remains, enforce single-flight refresh, and prevent stale rejected refreshes/401s from clearing a newer session.
+- v0.1.3 restores state from session storage for every protected operation and after service-worker recreation, verifies both token presence and a live protected config request before reporting sign-in success, refreshes a missing access token when a valid refresh token remains, enforces single-flight refresh, and prevents stale rejected refreshes/401s from clearing a newer session.
 - Missing local credentials now map to `Sign in to AMM Voice to continue.` Actual session-expired messaging remains limited to a protected 401 whose one refresh attempt is rejected.
 - The beta-only diagnostics panel contains only extension ID, access-token presence, refresh-token presence, authenticated-user presence, service-worker auth-restored state, and last protected request status. Diagnostic allowlisting excludes passwords, token values, drafts, threads, and email bodies.
 - Live Railway HTTP sequence at 2026-09-17 04:50 UTC: `GET /api/extension/config` 401, `POST /auth/extension/refresh` 200, retried config 200, then `POST /api/rewrite` 502. The rewrite application log confirms authentication, sender `cylina@authentic-moments.com`, request-schema validation, and model-stage entry all succeeded.
-- Exact production failure: OpenAI returned HTTP 400 `invalid_json_schema` for response format `rewrite_result`: the schema had to be an object but was sent as `type: "string"`. Local reproduction shows installed `openai@5.23.2` `zodTextFormat(...)` converting the Zod 4.6.5 object schema to `{ "type": "string" }`. No model output was generated and response parsing was never reached.
-- The canonical OpenAI adapter is a shared system and was not changed here. It must provide/test an object-root JSON Schema (for example through a verified Zod-4-compatible adapter or explicit JSON Schema plus server-side Zod validation) before another beta can pass live rewriting.
-- Pending extension error mapping distinguishes sign-in required, rejected refresh, unauthorized sender, invalid request, rate limiting, backend unavailable, model failure, malformed success response, and runtime/network failure. Request failures still cannot mutate Gmail drafts.
-- Automated extension coverage passes 49/49 with the pending inline-compose work. No new beta tag, ZIP, or GitHub release has been created.
+- The diagnosed production failure was OpenAI HTTP 400 `invalid_json_schema` for an incorrectly converted response schema. Canonical `main` commits `89ea1a5` and `166998e` repaired rewrite and training structured-output schemas without extension-owned shared-system changes. Production verification recorded by `f19f221` confirms AMM Style, Zac's Edit, and training analysis return valid structured output.
+- v0.1.3 error mapping distinguishes sign-in required, rejected refresh, unauthorized sender, invalid request, rate limiting, backend unavailable, model failure, malformed success response, and runtime/network failure. Request failures still cannot mutate Gmail drafts.
+- Automated extension coverage passes 49/49. `v0.1.3-beta` is published with the checksum and byte-match verification recorded above.
 - Published asset SHA-256: `7049e2e9898619bd2972ad47c829030c2fa113a6ae8ee6b48b32b5a2158b83a1`; downloaded GitHub asset matched the validated local ZIP byte-for-byte.
 
 - Merged canonical `main` through production-auth deployment documentation `e06498d`; shared server, Prisma, Railway, portal, and analytics implementations were accepted unchanged.
@@ -157,7 +157,7 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - Telemetry is a no-op; no competing analytics database or endpoint was added.
 - `submitFeedback` exists at the API boundary but canonical feedback wiring is unavailable.
 - Outbound coaching capture is off unless the backend explicitly returns `emailCoachingEnabled: true`; the canonical submission route is not yet supplied or wired.
-- Live Gmail inspection verified standalone New Compose plus inline Reply, Reply All, and Forward bodies, subjects, recipients, response markers, Send-row anchors, forwarded `.gmail_quote` history, and simultaneous standalone + inline boundaries. Installed-extension validation of the pending v0.1.3 code, changed From, and end-to-end rewriting remains.
+- Live Gmail inspection verified standalone New Compose plus inline Reply, Reply All, and Forward bodies, subjects, recipients, response markers, Send-row anchors, forwarded `.gmail_quote` history, and simultaneous standalone + inline boundaries. Installed-extension validation of the published v0.1.3 build, changed From, and end-to-end rewriting remains.
 
 ### Canonical native-auth compatibility
 
