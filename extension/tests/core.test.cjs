@@ -39,3 +39,8 @@ test("telemetry strips email content and accepts only conceptual events", () => 
 test("fixture corpus covers requested AMM Style and Zac's Edit scenarios", () => {
   const fixtures = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/rewrite-scenarios.json"), "utf8")); assert.equal(fixtures.filter((item) => item.mode === "amm_style").length, 9); assert.equal(fixtures.filter((item) => item.mode === "zacs_edit").length, 10); assert.equal(new Set(fixtures.map((item) => item.id)).size, fixtures.length);
 });
+
+test("content lifecycle observes removals without polling and loads before the content script", () => {
+  const content = fs.readFileSync(path.join(__dirname, "../content-script.js"), "utf8"); const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../manifest.json"), "utf8"));
+  assert.match(content, /record\.removedNodes/); assert.match(content, /controlsAttached/); assert.doesNotMatch(content, /setInterval/); assert.deepEqual(manifest.content_scripts[0].js.slice(-2), ["compose-lifecycle.js", "content-script.js"]);
+});

@@ -16,6 +16,7 @@
     const toolbars = [...(compose?.querySelectorAll?.('[role="toolbar"]') || [])]; const toolbar = toolbars.find((node) => node.parentElement && (node.parentElement.offsetWidth || node.parentElement.offsetHeight)) || toolbars[0];
     return { parent: toolbar?.parentElement || compose, before: null };
   }
+  function composeIdentity(compose) { return compose?.getAttribute?.("data-thread-perm-id") || compose?.getAttribute?.("aria-labelledby") || ""; }
   function draftText(body) { if (!body) return ""; const copy = body.cloneNode(true); copy.querySelectorAll?.(PROTECTED_SELECTOR).forEach((node) => node.remove()); return textOf(copy); }
   function detectSender(compose) {
     const selectors = ['input[name="from"]', '[name="from"] [email]', '[data-tooltip^="From:"]', '[aria-label^="From:"]', '[aria-label^="From "]', '[data-hovercard-id*="@"]'];
@@ -35,5 +36,5 @@
     const fragment = document.createDocumentFragment(); String(replacement).split("\n").forEach((line, index) => { if (index) fragment.append(document.createElement("br")); fragment.append(document.createTextNode(line)); }); body.insertBefore(fragment, body.firstChild); body.focus(); dispatchInput(body, String(replacement), "insertReplacementText"); return snapshot;
   }
   function restoreDraftBody(body, snapshot) { if (!body || !snapshot) return false; body.innerHTML = snapshot.html; body.focus(); dispatchInput(body, null, "historyUndo"); return true; }
-  return { BODY_SELECTOR, PROTECTED_SELECTOR, textOf, findBody, composeMount, draftText, detectSender, recipientAddress, composeContext, replaceDraftBody, restoreDraftBody };
+  return { BODY_SELECTOR, PROTECTED_SELECTOR, textOf, findBody, composeMount, composeIdentity, draftText, detectSender, recipientAddress, composeContext, replaceDraftBody, restoreDraftBody };
 });

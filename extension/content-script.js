@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const Core = AMMVoiceCore; const Gmail = AMMVoiceCompose; const composeStates = new WeakMap();
+  const Core = AMMVoiceCore; const Gmail = AMMVoiceCompose; const Lifecycle = AMMVoiceComposeLifecycle;
 
   async function call(type, payload) {
     const response = await chrome.runtime.sendMessage({ type, payload });
@@ -12,7 +12,7 @@
   function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node; }
   function button(text, className, label = text) { const node = element("button", className, text); node.type = "button"; node.setAttribute("aria-label", label); return node; }
 
-  function createPanel(compose) {
+  function createPanel() {
     const shell = element("section", "amm-voice-shell"); shell.setAttribute("aria-label", "AMM Voice email assistant");
     const actionBar = element("div", "amm-voice-actions");
     const ammButton = button("AMM Style", "amm-voice-action amm-voice-action--style", "Polish this draft with AMM Style");
@@ -37,8 +37,12 @@
     const replace = button("Replace Draft", "amm-voice-button amm-voice-button--primary"); const retry = button("Try Again", "amm-voice-button amm-voice-button--secondary"); const undo = button("Undo", "amm-voice-button amm-voice-button--secondary"); undo.disabled = true; const cancel = button("Cancel", "amm-voice-button amm-voice-button--quiet"); footer.append(replace, retry, undo, cancel);
     panel.append(header, senderRow, status, continueButton, result, footer); shell.append(actionBar, panel);
 
-    const mount = Gmail.composeMount(compose); if (mount.before) mount.parent.insertBefore(shell, mount.before); else mount.parent.prepend(shell);
     return { shell, actionBar, panel, ammButton, zacButton, close, title, subtitle, senderRow, sender, status, continueButton, result, suggested, warnings, warningList, review, reviewList, questions, questionList, footer, replace, retry, undo, cancel };
+  }
+
+  function attachControls(compose, state) {
+    compose.querySelectorAll?.(".amm-voice-shell").forEach((node) => { if (node !== state.ui.shell) node.remove(); });
+    const mount = Gmail.composeMount(compose); if (mount.before) mount.parent.insertBefore(state.ui.shell, mount.before); else mount.parent.prepend(state.ui.shell);
   }
 
   function setBusy(state, busy, label) {
@@ -86,13 +90,47 @@
     const state = { ...Core.createComposeSession(compose.getAttribute("data-thread-perm-id") || ""), compose, ui, settings: Core.SETTINGS_DEFAULTS };
     ui.ammButton.addEventListener("click", () => { state.mode = "amm_style"; emit("extension_opened", { mode: state.mode }); runRewrite(state); }); ui.zacButton.addEventListener("click", () => { state.mode = "zacs_edit"; emit("extension_opened", { mode: state.mode }); runRewrite(state); });
     ui.close.addEventListener("click", () => closePanel(state)); ui.cancel.addEventListener("click", () => closePanel(state)); ui.sender.addEventListener("change", () => { state.selectedSender = ui.sender.value; }); ui.continueButton.addEventListener("click", () => { if (state.errorCode === "AUTH_REQUIRED") { call("OPEN_SETTINGS").catch(() => {}); return; } state.ui.senderRow.hidden ? runRewrite(state) : continueWithSender(state); });
-    ui.retry.addEventListener("click", () => runRewrite(state, true)); ui.replace.addEventListener("click", () => { if (!state.output?.rewrittenText) return; state.undoSnapshot = Gmail.replaceDraftBody(Gmail.findBody(compose), state.output.rewrittenText); ui.undo.disabled = false; ui.status.textContent = "Draft replaced. Review it in Gmail before sending."; emit("rewrite_accepted", { mode: state.mode }); });
-    ui.undo.addEventListener("click", () => { if (Gmail.restoreDraftBody(Gmail.findBody(compose), state.undoSnapshot)) { state.undoSnapshot = null; ui.undo.disabled = true; ui.status.textContent = "The previous draft has been restored."; emit("rewrite_undone", { mode: state.mode }); } });
+    ui.retry.addEventListener("click", () => runRewrite(state, true)); ui.replace.addEventListener("click", () => { if (!state.output?.rewrittenText) return; state.undoSnapshot = Gmail.replaceDraftBody(Gmail.findBody(state.compose), state.output.rewrittenText); ui.undo.disabled = false; ui.status.textContent = "Draft replaced. Review it in Gmail before sending."; emit("rewrite_accepted", { mode: state.mode }); });
+    ui.undo.addEventListener("click", () => { if (Gmail.restoreDraftBody(Gmail.findBody(state.compose), state.undoSnapshot)) { state.undoSnapshot = null; ui.undo.disabled = true; ui.status.textContent = "The previous draft has been restored."; emit("rewrite_undone", { mode: state.mode }); } });
     ui.panel.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); closePanel(state); (state.mode === "zacs_edit" ? ui.zacButton : ui.ammButton).focus(); } });
-    extensionSettings().then((settings) => { state.settings = settings; if (settings.defaultAction === "zacs_edit") ui.actionBar.prepend(ui.zacButton); }).catch(() => {}); composeStates.set(compose, state); return state;
+    extensionSettings().then((settings) => { state.settings = settings; if (settings.defaultAction === "zacs_edit") ui.actionBar.prepend(ui.zacButton); }).catch(() => {}); return state;
   }
-  function enhance(compose) { if (composeStates.has(compose) || !Gmail.findBody(compose)) return; wireState(compose, createPanel(compose)); }
-  function scan(root = document) { if (root.matches?.('[role="dialog"]')) enhance(root); root.querySelectorAll?.('[role="dialog"]').forEach(enhance); }
-  const observer = new MutationObserver((records) => { records.forEach((record) => record.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) scan(node); })); });
-  observer.observe(document.documentElement, { childList: true, subtree: true }); scan();
+
+  const lifecycle = Lifecycle.createComposeLifecycle({
+    identityFor: Gmail.composeIdentity,
+    createState: (compose) => wireState(compose, createPanel()),
+    controlsAttached: (compose, state) => { const shells = compose.querySelectorAll(".amm-voice-shell"); return shells.length === 1 && shells[0] === state.ui.shell && state.ui.shell.isConnected && compose.contains(state.ui.shell); },
+    attachControls,
+    onRebind: (state, compose) => { state.compose = compose; },
+    onCleanup: (state) => { state.ui.shell.remove(); state.compose = null; }
+  });
+
+  function composeCandidates(root, candidates) {
+    if (root?.nodeType !== Node.ELEMENT_NODE) return;
+    if (root.matches?.('[role="dialog"]')) candidates.add(root);
+    root.querySelectorAll?.('[role="dialog"]').forEach((compose) => candidates.add(compose));
+  }
+  function composeContaining(node) { return node?.nodeType === Node.ELEMENT_NODE ? node.closest?.('[role="dialog"]') : node?.parentElement?.closest?.('[role="dialog"]'); }
+  function mutationTouchesComposeChrome(record, compose) {
+    const body = Gmail.findBody(compose); if (body && (record.target === body || body.contains(record.target))) return false;
+    return [...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE);
+  }
+  let reconcileQueued = false; const pendingComposes = new Set();
+  function queueReconcile() {
+    if (reconcileQueued) return; reconcileQueued = true;
+    queueMicrotask(() => { reconcileQueued = false; const ready = [...pendingComposes].filter((compose) => compose.isConnected && Gmail.findBody(compose)); pendingComposes.clear(); lifecycle.reconcile(ready); lifecycle.cleanupDisconnected(); });
+  }
+  function observe(records) {
+    let relevant = false;
+    records.forEach((record) => {
+      record.addedNodes.forEach((node) => composeCandidates(node, pendingComposes));
+      const compose = composeContaining(record.target);
+      if (compose && mutationTouchesComposeChrome(record, compose)) { pendingComposes.add(compose); relevant = true; }
+      if ([...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE && (node.matches?.(".amm-voice-shell, [role=dialog]") || node.querySelector?.(".amm-voice-shell, [role=dialog]")))) relevant = true;
+    });
+    if (relevant || pendingComposes.size) queueReconcile();
+  }
+  const observer = new MutationObserver(observe);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  lifecycle.reconcile([...document.querySelectorAll('[role="dialog"]')].filter((compose) => Gmail.findBody(compose)));
 })();
