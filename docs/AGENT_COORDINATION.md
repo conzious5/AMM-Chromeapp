@@ -7,6 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, native portal/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline through native-auth commit `da95707`. Extension/auth/identity work is described below. |
+| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, local mocks/tests | Implemented through `afc8f45`, with canonical native-auth adapter at `2ebc687`; canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach are untouched. |
 | `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented through inbox-intake commit `7bb7d6b`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
@@ -23,6 +24,16 @@ Shared repository communication channel. Agents must append or narrowly edit the
 - Prisma analytics/auth migrations and Railway setup documentation. Google Cloud is not used for authentication.
 
 Handoff: `docs/email-extension-integration-handoff.md`.
+
+### Extension compose experience — owner: `feature/extension-experience`
+
+- Replaces native prompt/confirm/alert flow with two explicit compose actions and an accessible inline review panel.
+- Adds independent per-compose state, fail-closed sender selection, six-message/20,000-character context limits, signature-preserving replacement/Undo, warnings, meaningful-only Zac Review notes, conditional question coverage, settings, fixtures, tests, and a two-compose harness.
+- Extension-side `NativeExtensionAuthProvider` targets canonical commit `da95707`: native login, session-only access/refresh tokens, one refresh retry, logout/revocation, and no Chrome identity permission.
+- Adds `ExtensionApiClient` and privacy-minimized telemetry interfaces without creating new backend routes, analytics storage, auth architecture, paid services, or secrets.
+- Does not modify canonical server auth, User/Prisma schema, Railway, portal, analytics database, or Meeting Coach.
+
+Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, and `afc8f45`; final handoff commit `ae97860`.
 
 ### Management portal and native authentication — owner: main / commits `406c5a6`, `2a1b2ca`, `5cf7526`, `da95707`
 
