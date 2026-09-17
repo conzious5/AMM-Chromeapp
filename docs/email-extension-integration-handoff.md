@@ -2,7 +2,7 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery), and `2d16e1b` (new-outbound-email coaching capture boundary). Initial handoff: `ae97860`.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery), `2d16e1b` (new-outbound-email coaching capture boundary), `edd37d0` (service-worker-authoritative auth restoration and safe diagnostics), and `06c039d` (generalized inline Reply/Reply All/Forward compose support). Initial handoff: `ae97860`.
 
 ### Email Communication Coaching — extension capture boundary
 
@@ -73,6 +73,21 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 
 ### Beta validation continuation
 
+#### v0.1.3 inline Reply / Reply All / Forward compatibility — release pending
+
+- **What was built:** compose discovery now begins with Gmail's real `g_editable="true"` message body and resolves a generalized semantic compose boundary. Standalone New Compose resolves to `role="dialog"`; inline Reply, Reply All, and Forward resolve to `role="region"`. All modes use the same adapter contract for body, subject, sender, recipients, bounded thread context, toolbar anchor, replacement, and Undo.
+- **Root cause:** the content script discovered, initialized, and reconciled only `[role="dialog"]` roots. Gmail's inline response editors are not dialogs, so their valid body and Send-row toolbar never entered the compose lifecycle.
+- **Live Gmail DOM findings (September 16, 2026):** inline response regions contain the same `g_editable` message body and a safe Send-row mount but no dialog ancestor. Gmail currently exposes response-type image markers `.mL` (Reply), `.mK` (Reply All), and `.mI` (Forward); Forward keeps forwarded material in `.gmail_quote`. Reply/Reply All have subject inputs and live recipient structures inside the region. Gmail may leave the hidden `input[name="from"]` empty for the default account sender, so the UI falls back to the live authenticated user returned by protected extension config; an explicit Gmail From value still takes precedence.
+- **Injection/lifecycle:** initial scan, mutation discovery, containing-compose lookup, duplicate prevention, toolbar reattachment, cleanup, and per-compose state now operate on generalized compose roots. Each root receives a generated compose identity only when Gmail does not expose one. No Gmail native control is changed and no Send operation exists.
+- **Draft and recipient safety:** replacement remains limited to content before `.gmail_signature`, `.gmail_quote`, or smart-signature nodes; Undo restores the exact previous body HTML. The adapter exposes recipient getters only—no recipient setter—and retains the existing prohibition on triggering Send.
+- **Automated coverage:** generalized fixtures cover New Compose, Reply, Reply All, and Forward discovery/classification and the shared operation contract; protected signature/quote extraction, duplicate prevention, toolbar reattachment, independent compose state, exact Undo infrastructure, recipient read-only behavior, sender fallback, and absence of Send interaction remain covered. `node --test extension/tests/*.test.cjs` passes 49/49; extension syntax and manifest parsing pass.
+- **Real Gmail validation:** live Chrome inspection confirmed the four DOM modes, their body/subject/recipient shapes, response markers, safe Send-row anchor, and simultaneous standalone + inline compose boundaries. The installed v0.1.2 build still showed controls only in New Compose, as expected. Chrome automation is prohibited from opening `chrome://extensions`, so this branch build could not be loaded into the signed-in browser to certify visible AMM controls, Replace Draft, and Undo in all four modes. Human Load-unpacked retesting remains required.
+- **Version/release:** `extension/manifest.json` is advanced to `0.1.3`. Intended next prerelease is `v0.1.3-beta`, but no ZIP, tag, GitHub release, or existing asset replacement was created. Release remains blocked on the canonical OpenAI structured-output repair described below so live rewriting can be meaningfully tested.
+- **Files changed:** `extension/compose-adapter.js`, `extension/content-script.js`, `extension/core.js`, `extension/manifest.json`, `extension/tests/adapters.test.cjs`, and `extension/tests/core.test.cjs`.
+- **Shared systems:** no canonical auth backend, Prisma, migration, Railway, portal, analytics, Meeting Coach, route, or environment-variable changes.
+- **Potential merge conflicts:** extension-owned compose adapter/content script/core/manifest and their tests. No shared-system conflict is introduced.
+- **Remaining work:** merge with the canonical OpenAI fix, build the immutable v0.1.3 package, then run installed-Chrome New Compose/Reply/Reply All/Forward, both-From-address, replacement/Undo, signature/quote, toolbar-rebuild, and multiple-editor testing before publishing.
+
 #### v0.1.2 Gmail compose-control lifecycle fix
 
 - Root cause: Gmail can replace the toolbar subtree without replacing the compose dialog. The prior `WeakMap` treated a known compose as proof that its AMM controls were still attached, so a removed shell was never recreated.
@@ -108,7 +123,7 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - Exact production failure: OpenAI returned HTTP 400 `invalid_json_schema` for response format `rewrite_result`: the schema had to be an object but was sent as `type: "string"`. Local reproduction shows installed `openai@5.23.2` `zodTextFormat(...)` converting the Zod 4.6.5 object schema to `{ "type": "string" }`. No model output was generated and response parsing was never reached.
 - The canonical OpenAI adapter is a shared system and was not changed here. It must provide/test an object-root JSON Schema (for example through a verified Zod-4-compatible adapter or explicit JSON Schema plus server-side Zod validation) before another beta can pass live rewriting.
 - Pending extension error mapping distinguishes sign-in required, rejected refresh, unauthorized sender, invalid request, rate limiting, backend unavailable, model failure, malformed success response, and runtime/network failure. Request failures still cannot mutate Gmail drafts.
-- Automated extension coverage passes 45/45. No new beta tag, ZIP, or GitHub release has been created.
+- Automated extension coverage passes 49/49 with the pending inline-compose work. No new beta tag, ZIP, or GitHub release has been created.
 - Published asset SHA-256: `7049e2e9898619bd2972ad47c829030c2fa113a6ae8ee6b48b32b5a2158b83a1`; downloaded GitHub asset matched the validated local ZIP byte-for-byte.
 
 - Merged canonical `main` through production-auth deployment documentation `e06498d`; shared server, Prisma, Railway, portal, and analytics implementations were accepted unchanged.
@@ -142,7 +157,7 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - Telemetry is a no-op; no competing analytics database or endpoint was added.
 - `submitFeedback` exists at the API boundary but canonical feedback wiring is unavailable.
 - Outbound coaching capture is off unless the backend explicitly returns `emailCoachingEnabled: true`; the canonical submission route is not yet supplied or wired.
-- Live Gmail new-compose inspection verified the `g_editable="true"` draft body, a visible `.aDh` panel mount, the subject field, and fail-closed From detection. Reply, reply-all, forward, changed From, and installed-extension behavior remain.
+- Live Gmail inspection verified standalone New Compose plus inline Reply, Reply All, and Forward bodies, subjects, recipients, response markers, Send-row anchors, forwarded `.gmail_quote` history, and simultaneous standalone + inline boundaries. Installed-extension validation of the pending v0.1.3 code, changed From, and end-to-end rewriting remains.
 
 ### Canonical native-auth compatibility
 
@@ -150,7 +165,7 @@ The extension provider targets `da95707`: email/password login, `chrome.storage.
 
 ### Verification
 
-- `node --test extension/tests/*.test.cjs`: 39 tests passed.
+- `node --test extension/tests/*.test.cjs`: 49 tests passed.
 - All extension JavaScript passed `node --check`.
 - Manifest and the 19-scenario fixture corpus parse as JSON.
 - Static tests guard multiple-compose isolation, sender fallback, thread limits, question display, session-only auth behavior, draft extraction, privacy-safe telemetry, and absence of Gmail Send interaction.
