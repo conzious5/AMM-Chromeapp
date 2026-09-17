@@ -1,5 +1,19 @@
 # Email extension and identity-context handoff
 
+## Production structured-output hotfix — `main`
+
+What was built: the canonical OpenAI Responses adapter now sends explicit JSON Schema objects for both `rewrite_result` and `training_analysis`, parses `output_text` once, and validates the decoded value with the existing Zod schema. Safe model-error logging retains upstream status/code/type/parameter/request ID without logging request content or secrets.
+
+Branch and commits: `main`; `89ea1a5` (rewrite schema, parsing, regression coverage, safe upstream classification) and `166998e` (training schema, full structured-output audit, malformed-output tests).
+
+Files added or modified: `server/src/schemas/rewrite.ts`, `server/src/schemas/training.ts`, `server/src/services/OpenAIResponsesModel.ts`, `server/src/services/modelError.ts`, `server/src/app.ts`, and `server/tests/openAIResponsesModel.test.ts`. No Chrome extension files, database schema, migrations, roles, passwords, or sender permissions changed.
+
+Interfaces and requirements: `/api/rewrite` is unchanged. AMM Style and Zac's Edit share `rewrite_result`; training analysis uses its own `training_analysis` schema. Both schemas are strict object roots with required fields and `additionalProperties: false`. No new environment variables, database requirements, authentication requirements, analytics fields, routes, or UI changes are required.
+
+Tests and production verification: server typecheck and build passed; Vitest passed 5 files / 19 tests on the production-lineage worktree. Tests assert both schemas are objects with root `type: object`, reject malformed model output through Zod, accept valid output, and preserve array types. Railway deployment `ca3eb193-955b-42ad-a5f3-2fd0a014f111` is active. Health returned 200/ok. Privacy-safe synthetic production tests passed for AMM Style, Zac's Edit, and training analysis; the temporary session was revoked. No `invalid_json_schema` or rewrite failure appeared on the active deployment.
+
+Known limitations and remaining work: the helper incompatibility remains in the installed dependency pair, so future structured-output paths must follow the explicit-schema convention or first prove a dependency upgrade fixes conversion. The installed extension beta can be retested without reinstalling because the fix is server-only.
+
 ## Extension experience continuation — `feature/extension-experience`
 
 Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), and `afc8f45` (meaningful-only Zac Review filtering). Final handoff: `ae97860`.

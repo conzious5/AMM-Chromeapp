@@ -164,7 +164,8 @@ No canonical Prisma models have been accepted. The feature branch contains a rel
 
 - Model calls occur only on the backend.
 - OpenAI requests use `store: false`.
-- Validate structured model output with Zod.
+- Canonical Responses API structured outputs use explicit, source-controlled JSON Schema objects. Do not use `zodTextFormat` with the current `openai@5.23.2` / `zod@4.6.5` dependency pair because its converter emits an incorrect string-root schema for Zod 4 objects.
+- Parse `response.output_text` once, then validate structured model output with the corresponding canonical Zod schema. Rewrite and training analysis each own a distinct strict object-root schema with all fields required and `additionalProperties: false`.
 - Do not log email bodies, transcript text, or evidence quotes.
 - Existing email rewriting uses the shared `LanguageModel` abstraction. Meeting Coach currently has a separate feature-local model adapter that follows the same Responses API conventions; consolidation is a final-integration decision.
 
@@ -254,5 +255,6 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 ## Final integration status
 
 - Email extension/auth/identity/analytics foundation: native-auth implementation and handoff are committed on `main`. The canonical ADMIN and TEAM users are initialized with correct roles and sender permissions. Both bootstrap variables were removed and a production restart preserved users, credentials, sender permissions, and database-backed sessions. Sanitized checks passed for invalid login, server-side TEAM `403`, session survival/revocation, and health; future restarts do not require bootstrap variables. ADMIN now has temporary QA access to the shared `hello@authentic-moments.com` sender; live authenticated extension config returned `200` with the expected ADMIN mapping, while Cylina's mappings remained unchanged.
+- OpenAI structured-output hotfix: commits `89ea1a5` and `166998e` are on `main` and active in Railway production. AMM Style, Zac's Edit, and training analysis all use explicit object-root schemas plus Zod validation. Synthetic production checks passed for all three; both rewrite routes returned HTTP 200, health returned 200/ok, and the active deployment logged no `invalid_json_schema` failure.
 - Meeting Coach: feature-complete on its branch at the domain/service level with shared-inbox intake boundary at `7bb7d6b`; live Gmail, shared-system integration, and transcript-content confirmation remain.
 - Canonical auth and its Prisma models are decided; Meeting Coach still requires final reconciliation for persistence, analytics, routes, portal navigation, Railway, and any unrelated future Google data integration.
