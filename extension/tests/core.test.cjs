@@ -29,7 +29,8 @@ test("question coverage and calm warnings are UI-ready", () => {
 });
 
 test("error mapping preserves actionable recovery", () => {
-  assert.equal(core.classifyError(new Error("SIGN_IN_REQUIRED")).code, "AUTH_REQUIRED"); assert.equal(core.classifyError(new Error("429")).code, "RATE_LIMIT"); assert.equal(core.classifyError(new TypeError("Illegal invocation")).code, "NETWORK"); assert.match(core.classifyError(new Error("Failed to fetch")).message, /draft is safe/); assert.equal(core.classifyError(new Error("MALFORMED_REWRITE_RESPONSE")).code, "MALFORMED_RESPONSE");
+  const missing = core.classifyError(new Error("SIGN_IN_REQUIRED")); const expired = core.classifyError(new Error("AUTHENTICATION_EXPIRED"));
+  assert.equal(missing.message, "Sign in to AMM Voice to continue."); assert.match(expired.message, /session expired/); assert.equal(core.classifyError(Object.assign(new Error("denied"), { code: "UNAUTHORIZED_SENDER" })).code, "UNAUTHORIZED_SENDER"); assert.equal(core.classifyError(Object.assign(new Error("bad"), { code: "INVALID_REQUEST" })).code, "INVALID_REQUEST"); assert.equal(core.classifyError(Object.assign(new Error("down"), { code: "BACKEND_UNAVAILABLE" })).code, "BACKEND_UNAVAILABLE"); assert.equal(core.classifyError(Object.assign(new Error("model"), { code: "MODEL_FAILURE" })).code, "MODEL"); assert.equal(core.classifyError(new Error("429")).code, "RATE_LIMIT"); assert.equal(core.classifyError(new TypeError("Illegal invocation")).code, "NETWORK"); assert.match(core.classifyError(new Error("Failed to fetch")).message, /draft is safe/); assert.equal(core.classifyError(Object.assign(new Error("incomplete"), { code: "MALFORMED_RESPONSE" })).code, "MALFORMED_RESPONSE");
 });
 
 test("telemetry strips email content and accepts only conceptual events", () => {

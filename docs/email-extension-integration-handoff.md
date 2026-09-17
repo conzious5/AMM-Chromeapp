@@ -97,6 +97,18 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - Production transport smoke tests reached `/api/rewrite` for both `amm_style` and `zacs_edit` and received the expected HTTP 401 for an intentionally invalid bearer token. Authenticated production rewriting remains a manual installed-beta retest.
 - Extension version advanced to `0.1.1`; v0.1.0-beta remains immutable.
 - GitHub prerelease: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.1-beta`; direct asset: `https://github.com/conzious5/AMM-Chromeapp/releases/download/v0.1.1-beta/AMM-Voice-Beta-v0.1.1.zip`.
+
+#### Pending local-auth restoration and live rewrite diagnosis — no release yet
+
+- The service worker is the only token owner. Options and Gmail continue to use runtime messaging; tokens remain under the identical `accessToken`, `refreshToken`, and `currentUser` keys in `chrome.storage.session`, and no token enters page DOM or content-script state.
+- Pending extension changes restore state from session storage for every protected operation and after service-worker recreation, verify both token presence and a live protected config request before reporting sign-in success, refresh a missing access token when a valid refresh token remains, enforce single-flight refresh, and prevent stale rejected refreshes/401s from clearing a newer session.
+- Missing local credentials now map to `Sign in to AMM Voice to continue.` Actual session-expired messaging remains limited to a protected 401 whose one refresh attempt is rejected.
+- The beta-only diagnostics panel contains only extension ID, access-token presence, refresh-token presence, authenticated-user presence, service-worker auth-restored state, and last protected request status. Diagnostic allowlisting excludes passwords, token values, drafts, threads, and email bodies.
+- Live Railway HTTP sequence at 2026-09-17 04:50 UTC: `GET /api/extension/config` 401, `POST /auth/extension/refresh` 200, retried config 200, then `POST /api/rewrite` 502. The rewrite application log confirms authentication, sender `cylina@authentic-moments.com`, request-schema validation, and model-stage entry all succeeded.
+- Exact production failure: OpenAI returned HTTP 400 `invalid_json_schema` for response format `rewrite_result`: the schema had to be an object but was sent as `type: "string"`. Local reproduction shows installed `openai@5.23.2` `zodTextFormat(...)` converting the Zod 4.6.5 object schema to `{ "type": "string" }`. No model output was generated and response parsing was never reached.
+- The canonical OpenAI adapter is a shared system and was not changed here. It must provide/test an object-root JSON Schema (for example through a verified Zod-4-compatible adapter or explicit JSON Schema plus server-side Zod validation) before another beta can pass live rewriting.
+- Pending extension error mapping distinguishes sign-in required, rejected refresh, unauthorized sender, invalid request, rate limiting, backend unavailable, model failure, malformed success response, and runtime/network failure. Request failures still cannot mutate Gmail drafts.
+- Automated extension coverage passes 45/45. No new beta tag, ZIP, or GitHub release has been created.
 - Published asset SHA-256: `7049e2e9898619bd2972ad47c829030c2fa113a6ae8ee6b48b32b5a2158b83a1`; downloaded GitHub asset matched the validated local ZIP byte-for-byte.
 
 - Merged canonical `main` through production-auth deployment documentation `e06498d`; shared server, Prisma, Railway, portal, and analytics implementations were accepted unchanged.

@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { DevelopmentAuthProvider, NativeExtensionAuthProvider } = require("../auth-provider.js");
-const { ExtensionApiClient } = require("../extension-api-client.js");
+const { ExtensionApiClient, responseError } = require("../extension-api-client.js");
+const diagnostics = require("../auth-diagnostics.js");
 const compose = require("../compose-adapter.js");
 
 test("development auth implements sign-in, current-user, token, and sign-out", async () => {
@@ -18,6 +19,41 @@ test("native auth keeps rotating tokens in session storage and never stores the 
   const requests = []; const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async (url, init) => { requests.push({ url, body: init.body }); return { ok: true, status: url.endsWith("logout") ? 204 : 200, async json() { return responses.shift(); } }; });
   await auth.signIn({ email: "cylina@authentic-moments.com", password: "never-store-this" }); assert.equal(await auth.getAccessToken(), "access-1"); assert.equal(Object.values(values).includes("never-store-this"), false);
   assert.equal(await auth.refreshAccessToken(), true); assert.equal(await auth.getAccessToken(), "access-2"); assert.match(requests[1].body, /refresh-1/); await auth.signOut(); assert.equal(await auth.getAccessToken(), null);
+});
+
+test("a recreated service-worker provider restores the canonical session from storage", async () => {
+  const values = {}; const chromeApi = { storage: { session: { async get(keys) { const list = Array.isArray(keys) ? keys : [keys]; return Object.fromEntries(list.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  const loginFetch = async () => ({ ok: true, status: 200, async json() { return { user: { email: "admin@authentic-moments.com" }, accessToken: "access", refreshToken: "refresh" }; } });
+  const firstWorker = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), loginFetch); await firstWorker.signIn({ email: "admin@authentic-moments.com", password: "private" });
+  const restartedWorker = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async () => { throw new Error("not needed"); }); const status = await restartedWorker.sessionStatus();
+  assert.deepEqual(status, { accessTokenPresent: true, refreshTokenPresent: true, currentUserPresent: true, authenticated: true }); assert.equal(await restartedWorker.getAccessToken(), "access");
+});
+
+test("missing access token with a valid refresh token refreshes and retries protected work once", async () => {
+  const values = { refreshToken: "refresh-1", currentUser: { email: "admin@authentic-moments.com" } }; const chromeApi = { storage: { session: { async get(keys) { const list = Array.isArray(keys) ? keys : [keys]; return Object.fromEntries(list.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  let refreshCalls = 0; let protectedCalls = 0; const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async (url) => { refreshCalls += 1; assert.match(url, /refresh$/); return { ok: true, status: 200, async json() { return { user: { email: "admin@authentic-moments.com" }, accessToken: "access-2", refreshToken: "refresh-2" }; } }; });
+  const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async (_url, init) => { protectedCalls += 1; assert.equal(init.headers.authorization, "Bearer access-2"); return { ok: true, status: 200, async json() { return { authenticatedUser: "admin@authentic-moments.com", senderAddresses: ["admin@authentic-moments.com"] }; } }; } });
+  const config = await client.getCurrentUser(); assert.equal(config.authenticatedUser, "admin@authentic-moments.com"); assert.equal(refreshCalls, 1); assert.equal(protectedCalls, 1);
+});
+
+test("AMM Style and Zac's Edit both use the restored bearer token immediately after login", async () => {
+  const calls = []; const auth = { async getAccessToken() { return "access"; } }; const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async (_url, init) => { calls.push({ authorization: init.headers.authorization, mode: JSON.parse(init.body).mode }); return { ok: true, status: 200, async json() { return { rewrittenText: "Safe suggestion", reviewNotes: [], warnings: [] }; } }; } });
+  await client.rewriteEmail({ mode: "amm_style", draft: "Draft" }); await client.rewriteEmail({ mode: "zacs_edit", draft: "Draft" }); assert.deepEqual(calls, [{ authorization: "Bearer access", mode: "amm_style" }, { authorization: "Bearer access", mode: "zacs_edit" }]);
+});
+
+test("a stale rejected refresh cannot clear a newer signed-in session", async () => {
+  const values = { accessToken: "old-access", refreshToken: "old-refresh", currentUser: { email: "admin@authentic-moments.com" } }; const chromeApi = { storage: { session: { async get(keys) { const list = Array.isArray(keys) ? keys : [keys]; return Object.fromEntries(list.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  let release; const refreshResponse = new Promise((resolve) => { release = resolve; }); const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async () => refreshResponse);
+  const pending = auth.refreshAccessToken(); await Promise.resolve(); await chromeApi.storage.session.set({ accessToken: "new-access", refreshToken: "new-refresh", currentUser: { email: "admin@authentic-moments.com" } }); release({ ok: false, status: 401, async json() { return { error: "rejected" }; } });
+  assert.equal(await pending, false); assert.equal(values.accessToken, "new-access"); assert.equal(values.refreshToken, "new-refresh");
+});
+
+test("privacy-safe auth diagnostics reject token and content fields", () => {
+  assert.deepEqual(diagnostics.safeDetails({ access_token_present: true, refresh_token_present: true, accessToken: "secret", refreshToken: "secret", draft: "private", emailBody: "private", last_protected_request_status: 502 }), { access_token_present: true, refresh_token_present: true, last_protected_request_status: 502 });
+});
+
+test("HTTP failures map to specific safe extension error categories", () => {
+  assert.equal(responseError({ status: 403 }, { error: "Sender address is not permitted for this user" }).code, "UNAUTHORIZED_SENDER"); assert.equal(responseError({ status: 400 }, { error: "Invalid request" }).code, "INVALID_REQUEST"); assert.equal(responseError({ status: 429 }, {}).code, "RATE_LIMIT"); assert.equal(responseError({ status: 502 }, { error: "Rewrite failed" }).code, "MODEL_FAILURE"); assert.equal(responseError({ status: 503 }, {}).code, "BACKEND_UNAVAILABLE");
 });
 
 test("default service-worker fetch wrappers preserve the WorkerGlobalScope receiver", async () => {
@@ -77,7 +113,7 @@ test("generic fetch exceptions never sign out the user or become auth expiration
 test("malformed API success responses are rejected without producing replaceable text", async () => {
   const auth = { async getAccessToken() { return "token"; }, async signOut() {} };
   const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async () => ({ status: 200, ok: true, async json() { return { success: true }; } }) });
-  await assert.rejects(() => client.rewriteEmail({ mode: "amm_style", draft: "Safe original" }), /MALFORMED_REWRITE_RESPONSE/);
+  await assert.rejects(() => client.rewriteEmail({ mode: "amm_style", draft: "Safe original" }), (error) => error.code === "MALFORMED_RESPONSE");
 });
 
 test("logout clears local auth state even when the backend is unavailable", async () => {

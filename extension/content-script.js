@@ -4,11 +4,11 @@
 
   async function call(type, payload) {
     const response = await chrome.runtime.sendMessage({ type, payload });
-    if (!response?.ok) throw new Error(response?.error || "AMM Voice request failed.");
+    if (!response?.ok) { const details = response?.error; const error = new Error(typeof details === "object" ? details.message : details || "AMM Voice request failed."); if (details && typeof details === "object") { error.code = details.code; error.status = details.status; } throw error; }
     return response.result;
   }
   function emit(name, metadata) { chrome.runtime.sendMessage({ type: "TELEMETRY", name, metadata }).catch(() => {}); }
-  async function submitOutboundCoaching(payload) { const response = await chrome.runtime.sendMessage({ type: "SUBMIT_OUTBOUND_EMAIL_COACHING", payload }); if (!response?.ok) throw new Error(response?.error || "EMAIL_COACHING_SUBMISSION_FAILED"); return response.result; }
+  async function submitOutboundCoaching(payload) { const response = await chrome.runtime.sendMessage({ type: "SUBMIT_OUTBOUND_EMAIL_COACHING", payload }); if (!response?.ok) throw new Error(typeof response?.error === "object" ? response.error.message : response?.error || "EMAIL_COACHING_SUBMISSION_FAILED"); return response.result; }
   async function extensionSettings() { const saved = await chrome.storage.local.get(Object.keys(Core.SETTINGS_DEFAULTS)); return { ...Core.SETTINGS_DEFAULTS, ...saved }; }
   function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node; }
   function button(text, className, label = text) { const node = element("button", className, text); node.type = "button"; node.setAttribute("aria-label", label); return node; }

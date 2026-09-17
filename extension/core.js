@@ -40,15 +40,20 @@
     return { code: WARNING_MESSAGES[code] ? code : "REVIEW_SUGGESTED", message: WARNING_MESSAGES[code] || String(raw) };
   }
   function classifyError(error) {
-    const value = String(error?.message || error || "API failure");
-    if (/SIGN_IN_REQUIRED|AUTHENTICATION_EXPIRED/i.test(value)) return { code: "AUTH_REQUIRED", message: "Your session expired. Sign in again, then retry." };
+    const code = String(error?.code || ""); const value = `${code} ${String(error?.message || error || "API failure")}`;
+    if (/SIGN_IN_REQUIRED/i.test(value)) return { code: "AUTH_REQUIRED", message: "Sign in to AMM Voice to continue." };
+    if (/AUTHENTICATION_EXPIRED/i.test(value)) return { code: "AUTH_REQUIRED", message: "Your session expired. Sign in again, then retry." };
+    if (/UNAUTHORIZED_SENDER/i.test(value)) return { code: "UNAUTHORIZED_SENDER", message: "This From address is not authorized for your AMM Voice account." };
+    if (/INVALID_REQUEST/i.test(value)) return { code: "INVALID_REQUEST", message: "AMM Voice could not use this draft context. Your draft is unchanged." };
+    if (/BACKEND_UNAVAILABLE/i.test(value)) return { code: "BACKEND_UNAVAILABLE", message: "AMM Voice is temporarily unavailable. Your draft is safe; please try again." };
+    if (/MODEL_FAILURE|Rewrite failed/i.test(value)) return { code: "MODEL", message: "The AMM Voice model could not complete the rewrite. Your draft is unchanged." };
+    if (/MALFORMED_RESPONSE|MALFORMED/i.test(value)) return { code: "MALFORMED_RESPONSE", message: "AMM Voice returned an incomplete response. Your draft is unchanged; please try again." };
     if (/NO_DRAFT/i.test(value)) return { code: "NO_DRAFT", message: "Add some draft text before requesting a rewrite." };
     if (/SENDER_REQUIRED/i.test(value)) return { code: "SENDER_REQUIRED", message: "Choose an authorized From address to continue." };
     if (/RATE_LIMIT|429/i.test(value)) return { code: "RATE_LIMIT", message: "AMM Voice is receiving several requests. Wait a moment and try again." };
     if (/TIMEOUT|timed out|AbortError/i.test(value)) return { code: "TIMEOUT", message: "The request took too long. Your draft is unchanged; please try again." };
     if (/Failed to fetch|Illegal invocation|NetworkError|Load failed|NETWORK|offline/i.test(value)) return { code: "NETWORK", message: "AMM Voice couldn't connect. Your draft is safe. Please try again." };
     if (/MODEL/i.test(value)) return { code: "MODEL", message: "The rewrite could not be completed. Your draft is unchanged; please try again." };
-    if (/MALFORMED/i.test(value)) return { code: "MALFORMED_RESPONSE", message: "AMM Voice returned an incomplete response. Your draft is unchanged; please try again." };
     return { code: "API", message: value || "AMM Voice could not complete the request. Your draft is unchanged." };
   }
   function sanitizeTelemetry(name, metadata = {}) {

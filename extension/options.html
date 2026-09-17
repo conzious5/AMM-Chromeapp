@@ -24,6 +24,19 @@
       </section>
       <div class="actions"><button id="save">Save settings</button><button id="signin">Sign in</button><button id="signout" class="secondary">Sign out</button></div>
       <p id="status" role="status" aria-live="polite"></p>
+      <details class="diagnostics">
+        <summary>Developer diagnostics</summary>
+        <p class="diagnostics-note">Privacy-safe connection state only. Credentials and token values are never shown.</p>
+        <dl>
+          <div><dt>Extension ID</dt><dd id="diagnostic-extension-id">—</dd></div>
+          <div><dt>Access token present</dt><dd id="diagnostic-access">No</dd></div>
+          <div><dt>Refresh token present</dt><dd id="diagnostic-refresh">No</dd></div>
+          <div><dt>Authenticated user present</dt><dd id="diagnostic-user">No</dd></div>
+          <div><dt>Service worker auth restored</dt><dd id="diagnostic-restored">No</dd></div>
+          <div><dt>Last protected request</dt><dd id="diagnostic-request">None</dd></div>
+        </dl>
+        <button id="refresh-diagnostics" class="secondary" type="button">Refresh diagnostics</button>
+      </details>
     </main>
     <script src="options.js"></script>
   </body>
