@@ -2,7 +2,7 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), and `2ebc687` (extension-side adapter for canonical native auth `da95707`). This branch remains isolated and modifies only extension assets, extension tests/fixtures, and extension documentation.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), and `afc8f45` (meaningful-only Zac Review filtering). This branch remains isolated and modifies only extension assets, extension tests/fixtures, and extension documentation.
 
 ### What works now
 

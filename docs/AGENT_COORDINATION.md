@@ -7,7 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, Google/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline. Extension/auth/identity work is described below. |
-| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, local mocks/tests | Implemented at `657c95f`, `6eb8e9e`, and native-auth adapter commit `2ebc687`; canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach are untouched. |
+| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, local mocks/tests | Implemented through `afc8f45`, including native-auth adapter `2ebc687`; canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach are untouched. |
 | `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented through inbox-intake commit `7bb7d6b`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
