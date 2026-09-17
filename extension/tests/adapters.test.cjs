@@ -20,6 +20,13 @@ test("native auth keeps rotating tokens in session storage and never stores the 
   assert.equal(await auth.refreshAccessToken(), true); assert.equal(await auth.getAccessToken(), "access-2"); assert.match(requests[1].body, /refresh-1/); await auth.signOut(); assert.equal(await auth.getAccessToken(), null);
 });
 
+test("default service-worker fetch wrappers preserve the WorkerGlobalScope receiver", async () => {
+  const originalFetch = globalThis.fetch; const calls = [];
+  globalThis.fetch = function (url, init) { if (this !== globalThis) throw new TypeError("Illegal invocation"); calls.push({ url, init }); const login = String(url).endsWith("/auth/extension/login"); return Promise.resolve({ ok: true, status: 200, async json() { return login ? { user: { email: "cylina@authentic-moments.com" }, accessToken: "access", refreshToken: "refresh" } : { authenticatedUser: "cylina@authentic-moments.com", senderAddresses: ["cylina@authentic-moments.com"] }; } }); };
+  const values = {}; const chromeApi = { storage: { session: { async get(keys) { return Object.fromEntries(keys.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  try { const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" })); await auth.signIn({ email: "cylina@authentic-moments.com", password: "private" }); const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth }); const config = await client.getCurrentUser(); assert.equal(config.authenticatedUser, "cylina@authentic-moments.com"); assert.equal(calls.length, 2); } finally { globalThis.fetch = originalFetch; }
+});
+
 test("API client centralizes rewrite and expires unauthorized sessions", async () => {
   let signedOut = false; const auth = { async getAccessToken() { return "token"; }, async signOut() { signedOut = true; } };
   const okClient = new ExtensionApiClient({ backendUrl: "http://localhost:3000/", auth, fetchImpl: async (url, init) => ({ status: 200, ok: true, async json() { return { url, method: init.method, payload: JSON.parse(init.body), rewrittenText: "Safe rewrite", reviewNotes: [], warnings: [] }; } }) });
@@ -39,6 +46,26 @@ test("failed refresh clears native session and revoked authentication fails safe
   const chromeApi = { storage: { session: { async get(keys) { return Object.fromEntries(keys.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
   const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async () => ({ ok: false, status: 401, async json() { return { error: "Invalid refresh token" }; } }));
   assert.equal(await auth.refreshAccessToken(), false); assert.deepEqual(values, {});
+});
+
+test("refresh-time runtime failures remain network failures and do not clear auth state", async () => {
+  const values = { accessToken: "expired", refreshToken: "still-valid", currentUser: { email: "cylina@authentic-moments.com" } }; let signedOut = false; let requestCount = 0;
+  const chromeApi = { storage: { session: { async get(keys) { return Object.fromEntries(keys.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async () => { throw new TypeError("Illegal invocation"); }); const originalSignOut = auth.signOut.bind(auth); auth.signOut = async () => { signedOut = true; return originalSignOut(); };
+  const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async () => { requestCount += 1; return { status: 401, ok: false, async json() { return {}; } }; } });
+  await assert.rejects(() => client.getCurrentUser(), /Illegal invocation/); assert.equal(requestCount, 1); assert.equal(signedOut, false); assert.equal(values.refreshToken, "still-valid");
+});
+
+test("rejected refresh produces authentication expiration after exactly one refresh attempt", async () => {
+  let refreshes = 0; let signedOut = false; let requests = 0; const auth = { async getAccessToken() { return "expired"; }, async refreshAccessToken() { refreshes += 1; return false; }, async signOut() { signedOut = true; } };
+  const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async () => { requests += 1; return { status: 401, ok: false, async json() { return {}; } }; } });
+  await assert.rejects(() => client.getCurrentUser(), /AUTHENTICATION_EXPIRED/); assert.equal(refreshes, 1); assert.equal(requests, 1); assert.equal(signedOut, true);
+});
+
+test("generic fetch exceptions never sign out the user or become auth expiration", async () => {
+  let signedOut = false; const auth = { async getAccessToken() { return "valid"; }, async refreshAccessToken() { throw new Error("refresh must not run"); }, async signOut() { signedOut = true; } };
+  const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async () => { throw new TypeError("Failed to fetch"); } });
+  await assert.rejects(() => client.rewriteEmail({ mode: "amm_style", draft: "Original draft" }), /Failed to fetch/); assert.equal(signedOut, false);
 });
 
 test("malformed API success responses are rejected without producing replaceable text", async () => {
@@ -68,4 +95,10 @@ test("real-Gmail body and panel anchors avoid the AI prompt and hidden toolbars"
 
 test("extension implementation contains no Gmail Send interaction", () => {
   const fs = require("node:fs"); const path = require("node:path"); const source = fs.readFileSync(path.join(__dirname, "../content-script.js"), "utf8"); const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../manifest.json"), "utf8")); assert.equal(/\bSend\b.*\.click\s*\(/s.test(source), false); assert.equal(/data-tooltip\s*[*^$]?=\s*["']Send/i.test(source), false); assert.equal(manifest.permissions.includes("identity"), false);
+});
+
+test("request failures cannot mutate a Gmail draft without an explicit Replace Draft click", () => {
+  const fs = require("node:fs"); const path = require("node:path"); const source = fs.readFileSync(path.join(__dirname, "../content-script.js"), "utf8"); const replacementCalls = source.match(/Gmail\.replaceDraftBody\(/g) || [];
+  const replaceHandler = source.indexOf('ui.replace.addEventListener("click"'); const replacementCall = source.indexOf("Gmail.replaceDraftBody(");
+  assert.equal(replacementCalls.length, 1); assert.ok(replaceHandler >= 0); assert.ok(replacementCall > replaceHandler);
 });

@@ -33,6 +33,7 @@ Handoff: `docs/email-extension-integration-handoff.md`.
 - Adds `ExtensionApiClient` and privacy-minimized telemetry interfaces without creating new backend routes, analytics storage, auth architecture, paid services, or secrets.
 - Does not modify canonical server auth, User/Prisma schema, Railway, portal, analytics database, or Meeting Coach.
 - Final beta-validation pass merged canonical `main` through `e06498d`, strengthened only extension-owned auth/API failure handling and tests, prepared the v0.1.0 unpacked distribution/ZIP, and added Cylina's installation guide. Production health and invalid-login behavior are verified. Valid-user authentication and the real Gmail matrix remain blocked on human installation and private sign-in.
+- Installed-beta v0.1.0 exposed a Chrome WorkerGlobalScope `Illegal invocation` caused by detached native `fetch` references. The extension-owned v0.1.1 hotfix uses receiver-safe global fetch wrappers and preserves auth state for runtime/network failures; only an actual 401/403 refresh rejection becomes session expiration. No canonical auth, Prisma, Railway, portal, analytics, or Meeting Coach files were changed for this fix.
 
 Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, `afc8f45`, and beta-validation merge `1b75312`; initial handoff commit `ae97860`.
 

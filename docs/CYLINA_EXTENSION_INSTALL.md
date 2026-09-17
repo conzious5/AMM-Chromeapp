@@ -1,10 +1,10 @@
 # Install the AMM Voice beta in Chrome
 
-AMM Voice Beta v0.1.0 is an unpacked Chrome extension. It does not require Node, npm, pnpm, Git, or terminal access.
+AMM Voice Beta v0.1.1 is an unpacked Chrome extension. It does not require Node, npm, pnpm, Git, or terminal access.
 
 ## Install
 
-1. Download `AMM-Voice-Beta-v0.1.0.zip`.
+1. Download `AMM-Voice-Beta-v0.1.1.zip`.
 2. Unzip it.
 3. Move the resulting `amm-voice-extension` folder somewhere permanent. Chrome must be able to find the same folder after installation and updates.
 4. Open Chrome.

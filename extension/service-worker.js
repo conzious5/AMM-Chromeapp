@@ -1,6 +1,7 @@
 importScripts("auth-provider.js", "extension-api-client.js", "core.js", "telemetry.js");
 
 const DEFAULT_BACKEND = "https://ammserver-production.up.railway.app";
+const workerFetch = (...args) => globalThis.fetch(...args);
 const telemetry = new AMMVoiceTelemetry.NoopExtensionTelemetry();
 
 async function settings() {
@@ -17,9 +18,9 @@ async function services() {
   const developmentAllowed = value.developmentMode && /^http:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i.test(value.backendUrl);
   const auth = developmentAllowed
     ? new AMMVoiceAuth.DevelopmentAuthProvider({ senderAddresses: value.mockAuthorizedSenders })
-    : new AMMVoiceAuth.NativeExtensionAuthProvider(chrome, settings);
+    : new AMMVoiceAuth.NativeExtensionAuthProvider(chrome, settings, workerFetch);
   if (developmentAllowed) await auth.signIn();
-  return { auth, client: new AMMVoiceApi.ExtensionApiClient({ backendUrl: value.backendUrl, auth }) };
+  return { auth, client: new AMMVoiceApi.ExtensionApiClient({ backendUrl: value.backendUrl, auth, fetchImpl: workerFetch }) };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

@@ -6,11 +6,21 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e
 
 ### Beta validation continuation
 
+#### v0.1.1 service-worker fetch hotfix
+
+- Root cause: both `NativeExtensionAuthProvider` and `ExtensionApiClient` stored a native `fetch` reference and later invoked it as an object method. Chrome's service-worker implementation requires a valid `WorkerGlobalScope` receiver, so installed v0.1.0 could throw `Failed to execute 'fetch' on 'WorkerGlobalScope': Illegal invocation`.
+- Exact fix: the service worker now supplies `(...args) => globalThis.fetch(...args)`, while both reusable wrappers normalize default and injected fetch implementations through a receiver-safe wrapper.
+- Authentication correction: refresh-token 401/403 responses still clear the session and produce `AUTHENTICATION_EXPIRED`; network/runtime exceptions during refresh now propagate as network failures without clearing tokens or signing the user out.
+- User-facing runtime/network message: `AMM Voice couldn't connect. Your draft is safe. Please try again.`
+- Regression coverage reproduces a receiver-sensitive WorkerGlobalScope fetch, verifies both native-auth and protected API requests, exactly one refresh attempt, rejected-refresh expiration, generic exception preservation, and failure-only draft safety.
+- Production transport smoke tests reached `/api/rewrite` for both `amm_style` and `zacs_edit` and received the expected HTTP 401 for an intentionally invalid bearer token. Authenticated production rewriting remains a manual installed-beta retest.
+- Extension version advanced to `0.1.1`; v0.1.0-beta remains immutable.
+
 - Merged canonical `main` through production-auth deployment documentation `e06498d`; shared server, Prisma, Railway, portal, and analytics implementations were accepted unchanged.
 - Production health returned HTTP 200 and the native login UI rendered at `https://ammserver-production.up.railway.app`.
 - A production extension-login request using an intentionally invalid password returned HTTP 401 with the safe generic error `Invalid email or password.`
 - Extension auth/API tests now cover session-only token storage, no password persistence, exactly one refresh retry, refresh-token revocation, offline logout cleanup, malformed responses, and expired authentication.
-- Beta runtime files are staged under `dist/amm-voice-extension/` and zipped as `dist/AMM-Voice-Beta-v0.1.0.zip`; generated artifacts are ignored by Git.
+- Beta runtime files are staged under `dist/amm-voice-extension/` and zipped as `dist/AMM-Voice-Beta-v0.1.1.zip`; generated artifacts are ignored by Git.
 - Installation guide: `docs/CYLINA_EXTENSION_INSTALL.md`.
 - **BETA BLOCKED:** Valid Cylina credentials were not available to this agent, and Chrome's protected extension-management page cannot be automated. A human must load the unpacked package, sign in privately, and leave the live Gmail test session ready before the new-compose/reply/reply-all/forward, both-sender, replace/undo, and failure matrix can be certified.
 
@@ -44,7 +54,7 @@ The extension provider targets `da95707`: email/password login, `chrome.storage.
 
 ### Verification
 
-- `node --test extension/tests/*.test.cjs`: 17 tests passed.
+- `node --test extension/tests/*.test.cjs`: 22 tests passed.
 - All extension JavaScript passed `node --check`.
 - Manifest and the 19-scenario fixture corpus parse as JSON.
 - Static tests guard multiple-compose isolation, sender fallback, thread limits, question display, session-only auth behavior, draft extraction, privacy-safe telemetry, and absence of Gmail Send interaction.

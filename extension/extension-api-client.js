@@ -2,8 +2,9 @@
   const api = factory(); if (typeof module === "object" && module.exports) module.exports = api; root.AMMVoiceApi = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
+  function receiverSafeFetch(fetchImpl) { return fetchImpl ? (...args) => Reflect.apply(fetchImpl, globalThis, args) : (...args) => globalThis.fetch(...args); }
   class ExtensionApiClient {
-    constructor(options) { this.backendUrl = options.backendUrl.replace(/\/$/, ""); this.auth = options.auth; this.fetch = options.fetchImpl || fetch; this.timeoutMs = options.timeoutMs || 30000; }
+    constructor(options) { this.backendUrl = options.backendUrl.replace(/\/$/, ""); this.auth = options.auth; this.fetch = receiverSafeFetch(options.fetchImpl); this.timeoutMs = options.timeoutMs || 30000; }
     async request(path, init = {}, retry = true) { const token = await this.auth.getAccessToken(); if (!token) throw new Error("SIGN_IN_REQUIRED"); const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), this.timeoutMs); try { const response = await this.fetch(`${this.backendUrl}${path}`, { ...init, signal: controller.signal, headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...(init.headers || {}) } }); if (response.status === 401 && retry && this.auth.refreshAccessToken && await this.auth.refreshAccessToken()) return this.request(path, init, false); if (response.status === 401) { await this.auth.signOut(); throw new Error("AUTHENTICATION_EXPIRED"); } const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || `API failure (${response.status})`); return body; } finally { clearTimeout(timeout); } }
     async getCurrentUser() {
       const value = await this.request("/api/extension/config");
