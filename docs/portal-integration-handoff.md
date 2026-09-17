@@ -53,9 +53,9 @@ Railway PostgreSQL with all committed Prisma migrations applied in order. Migrat
 
 Canonical users and permissions:
 
-- `admin@authentic-moments.com` → `ADMIN`; personal sender permission.
+- `admin@authentic-moments.com` → `ADMIN`; personal sender permission plus temporary QA access to `hello@authentic-moments.com`.
 - `cylina@authentic-moments.com` → `TEAM`; `cylina@authentic-moments.com` and `hello@authentic-moments.com` sender permissions.
-- `hello@authentic-moments.com` is not a `User` and cannot log in.
+- `hello@authentic-moments.com` is a shared `SenderIdentity` permission for both human users, not a `User`, and cannot log in.
 
 ## Authentication requirements
 
@@ -148,6 +148,7 @@ Production verification on 2026-09-16:
 - Sanitized live verification passed: health `200/ok`; invalid login `401`; both canonical logins `200`; ADMIN route as ADMIN `200`; ADMIN route as TEAM `403`; both logouts `204`; and both revoked sessions subsequently returned `401` from `/auth/me`.
 - It is safe to remove `BOOTSTRAP_ADMIN_PASSWORD` and `BOOTSTRAP_TEAM_PASSWORD`. The bootstrap is create-only by normalized unique email, so later restarts do not overwrite initialized users.
 - Post-removal restart verification passed: neither bootstrap variable is present; both active user records, roles, credential timestamps, and sender permissions are unchanged; an existing TEAM session survived restart; TEAM still receives `403` on the ADMIN route; logout/revocation returns `204` then `401`; invalid login remains `401`; and health remains `200/ok`.
+- Temporary Chrome-extension QA authorization was added for `admin@authentic-moments.com` to use `hello@authentic-moments.com`. A live authenticated `GET /api/extension/config` returned `200` for the active ADMIN user with `admin@authentic-moments.com` and `hello@authentic-moments.com`; Cylina remained active TEAM with `cylina@authentic-moments.com` and `hello@authentic-moments.com`. The short-lived verification session was revoked successfully.
 
 ## Potential merge conflicts
 
@@ -155,7 +156,8 @@ Production verification on 2026-09-16:
 
 ## Remaining work
 
-- Perform real portal and Gmail-extension login/revocation tests for both canonical users and both of Cylina’s sender addresses.
+- Perform the manual Gmail-extension QA flow using the existing ADMIN account and both authorized ADMIN sender addresses.
+- Remove ADMIN's temporary `hello@authentic-moments.com` sender permission after the manual QA window; do not alter Cylina's shared-sender permission.
 - Add TOTP enrollment, verification, recovery codes, and admin recovery policy as the next auth-hardening feature.
 - Add portal analytics filter controls and replace remaining placeholder pages.
 - Integrate Meeting Coach through its published ports during shared-system reconciliation.

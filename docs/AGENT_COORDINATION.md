@@ -42,7 +42,7 @@ Authoritative continuation handoff: `docs/email-extension-integration-handoff.md
 - Railway runs `prisma migrate deploy` as a pre-deploy command. The Docker runtime generation fix in `2a1b2ca` is required so the packaged Prisma client is initialized after workspace deployment.
 - Native AMM Voice authentication is canonical. Google OAuth, Google Cloud, Firebase Authentication, and Google Identity Platform are not used for authentication.
 - Persisted `User`, `UserSenderPermission`, and `AuthSession` models support Argon2id passwords, server-side role checks, session revocation, portal cookies, and extension token rotation.
-- Canonical accounts are `admin@authentic-moments.com` (`ADMIN`) and `cylina@authentic-moments.com` (`TEAM`). `hello@authentic-moments.com` is only Cylina’s shared sender permission.
+- Canonical accounts are `admin@authentic-moments.com` (`ADMIN`) and `cylina@authentic-moments.com` (`TEAM`). For the current manual Chrome-extension QA window, `hello@authentic-moments.com` is a shared sender permission for both users; ADMIN's grant is temporary, while Cylina retains both her personal and shared-sender permissions.
 - The one-time bootstrap accepts `BOOTSTRAP_ADMIN_PASSWORD` and `BOOTSTRAP_TEAM_PASSWORD`; the variables must be deleted after accounts are created. No password is hardcoded.
 
 ### Meeting Coach — owner: `feature/meeting-coach`
@@ -241,6 +241,7 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 - Meeting Coach depends on final adapters for auth, persistence, analytics, routes, portal navigation, and optionally notifications/jobs.
 - Meeting Coach transcript intake depends on read access to mail delivered to `hello@authentic-moments.com`, idempotent processing keyed by Gmail message ID, and confirmation of whether real transcript content is in the email body, a text attachment, or a link.
 - Extension production sign-in depends on Railway CORS configuration for the installed extension origin and a stable Chrome extension ID. Native canonical-user bootstrap is complete.
+- After ADMIN's manual Chrome-extension QA is complete, remove only the temporary `admin@authentic-moments.com` → `hello@authentic-moments.com` permission; preserve Cylina's sender permissions.
 - Analytics deployment depends on running Prisma migrations.
 
 ## Decisions requiring Zac
@@ -252,6 +253,6 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 
 ## Final integration status
 
-- Email extension/auth/identity/analytics foundation: native-auth implementation and handoff are committed on `main`. The canonical ADMIN and TEAM users are initialized with correct roles and sender permissions. Both bootstrap variables were removed and a production restart preserved users, credentials, sender permissions, and database-backed sessions. Sanitized checks passed for invalid login, server-side TEAM `403`, session survival/revocation, and health; future restarts do not require bootstrap variables.
+- Email extension/auth/identity/analytics foundation: native-auth implementation and handoff are committed on `main`. The canonical ADMIN and TEAM users are initialized with correct roles and sender permissions. Both bootstrap variables were removed and a production restart preserved users, credentials, sender permissions, and database-backed sessions. Sanitized checks passed for invalid login, server-side TEAM `403`, session survival/revocation, and health; future restarts do not require bootstrap variables. ADMIN now has temporary QA access to the shared `hello@authentic-moments.com` sender; live authenticated extension config returned `200` with the expected ADMIN mapping, while Cylina's mappings remained unchanged.
 - Meeting Coach: feature-complete on its branch at the domain/service level with shared-inbox intake boundary at `7bb7d6b`; live Gmail, shared-system integration, and transcript-content confirmation remain.
 - Canonical auth and its Prisma models are decided; Meeting Coach still requires final reconciliation for persistence, analytics, routes, portal navigation, Railway, and any unrelated future Google data integration.
