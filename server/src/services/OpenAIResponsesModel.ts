@@ -1,7 +1,6 @@
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import { rewriteModelResultSchema, rewriteResultTextFormat } from "../schemas/rewrite.js";
-import { trainingAnalysisSchema } from "../schemas/training.js";
+import { trainingAnalysisSchema, trainingAnalysisTextFormat } from "../schemas/training.js";
 import type { LanguageModel, RewriteModelResult } from "../types.js";
 
 export class OpenAIResponsesModel implements LanguageModel {
@@ -36,14 +35,16 @@ export class OpenAIResponsesModel implements LanguageModel {
   }
 
   async analyzeTrainingPair(input: { instructions: string; payload: unknown }): Promise<unknown> {
-    const response = await this.client.responses.parse({
+    const response = await this.client.responses.create({
       model: this.model,
       store: false,
       instructions: input.instructions,
       input: JSON.stringify(input.payload),
-      text: { format: zodTextFormat(trainingAnalysisSchema, "training_analysis") }
+      text: { format: trainingAnalysisTextFormat }
     });
-    if (!response.output_parsed) throw new Error("The model did not return a valid training analysis.");
-    return response.output_parsed;
+    let decoded: unknown;
+    try { decoded = JSON.parse(response.output_text); }
+    catch { throw new Error("The model did not return valid structured JSON."); }
+    return trainingAnalysisSchema.parse(decoded);
   }
 }
