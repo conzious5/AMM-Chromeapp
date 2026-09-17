@@ -7,7 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, native portal/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline through native-auth commit `da95707`. Extension/auth/identity work is described below. |
-| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, beta package/validation | Canonical `main` merged; extension hardened through v0.1.2 Gmail lifecycle fix `5132cb1`. Canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach remain unchanged from `main`. |
+| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, beta package/validation, new-outbound-email coaching capture | Extension-owned capture boundary implemented through `2d16e1b`; canonical server auth, Prisma, portal, analytics, Railway, Meeting Coach, and coaching backend remain unchanged from `main`. |
 | `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented through inbox-intake commit `7bb7d6b`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
@@ -37,8 +37,9 @@ Handoff: `docs/email-extension-integration-handoff.md`.
 - `v0.1.1-beta` is published from hotfix commit `34bb946` plus handoff commit `d70c8a7`: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.1-beta`. Asset SHA-256 `7049e2e9898619bd2972ad47c829030c2fa113a6ae8ee6b48b32b5a2158b83a1` was verified after downloading it from GitHub. Manual installed-beta retesting remains required.
 - Installed-beta v0.1.1 exposed a Gmail SPA lifecycle regression: replacing the compose toolbar removed AMM controls while the compose remained marked initialized. The extension-owned v0.1.2 fix separates known-compose state from attached-control state, reattaches the same shell after relevant DOM replacement, prevents duplicates, preserves per-compose state/drafts, isolates multiple compose windows, and cleans up closed compose state. It does not modify shared systems.
 - `v0.1.2-beta` is published from lifecycle commit `5132cb1`: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.2-beta`. Asset SHA-256 `42dc01c49f73b8fef5c017c9f5dbe751421afc7a32a9db74fef63574bce70d95` was verified after downloading it from GitHub. Automated extension coverage passes 28/28; manual installed-Chrome retesting remains required.
+- Email Communication Coaching extension capture is implemented at `2d16e1b`. It passively snapshots newly sent, backend-enabled, authorized business email at the trusted Gmail Send click; never triggers, delays, blocks, or changes Send; keeps rewrite lineage only in compose memory; excludes signatures/quoted history from `finalBody`; bounds separate thread context; deduplicates same-snapshot observations for 15 seconds; and drops failed submissions without persistent raw-body retries. No historical Sent crawl, Gmail API OAuth, Google Cloud, backend route, persistence, analysis, or portal reporting was added. Automated extension coverage passes 39/39.
 
-Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, `afc8f45`, beta-validation merge `1b75312`, v0.1.1 fetch hotfix `34bb946`, and v0.1.2 lifecycle fix `5132cb1`; initial handoff commit `ae97860`.
+Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, `afc8f45`, beta-validation merge `1b75312`, v0.1.1 fetch hotfix `34bb946`, v0.1.2 lifecycle fix `5132cb1`, and outbound-coaching capture `2d16e1b`; initial handoff commit `ae97860`.
 
 ### Management portal and native authentication — owner: main / commits `406c5a6`, `2a1b2ca`, `5cf7526`, `da95707`
 
@@ -104,6 +105,10 @@ See the branch handoff before accepting these proposals.
 ```
 
 `authenticatedUser` is deliberately absent. It comes from `AuthPrincipal.email`.
+
+### Proposed outbound email coaching contract — awaiting Core Platform
+
+The extension exports `submitOutboundEmailForCoaching(payload)` with an injected path; no canonical route exists yet. The payload carries `eventId`, observation/compose metadata, authorized sender, recipient list, current subject, authored final body, optional bounded thread context/conversation reference, and boolean/warning assistance lineage. It deliberately omits `authenticatedUser`, credentials, original drafts, and suggestion bodies. Core Platform must derive the human from the access token, reauthorize the sender, enforce `emailCoachingEnabled`, deduplicate the idempotency key, and decide persistence/retention before enabling it. Full schema is in `docs/email-extension-integration-handoff.md`.
 
 ### Authentication principal
 
@@ -246,6 +251,7 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 - Meeting Coach depends on final adapters for auth, persistence, analytics, routes, portal navigation, and optionally notifications/jobs.
 - Meeting Coach transcript intake depends on read access to mail delivered to `hello@authentic-moments.com`, idempotent processing keyed by Gmail message ID, and confirmation of whether real transcript content is in the email body, a text attachment, or a link.
 - Extension production sign-in depends on native user bootstrap, Railway CORS configuration for the installed extension origin, and a stable Chrome extension ID.
+- Email Communication Coaching depends on Core Platform adding `emailCoachingEnabled` to extension config plus one canonical authenticated/idempotent submission route, server-side sender authorization, storage/retention policy, analysis orchestration, analytics adaptation, and portal reporting. Until all are present, production capture defaults off and the client endpoint remains unwired.
 - Analytics deployment depends on running Prisma migrations.
 
 ## Decisions requiring Zac
@@ -255,6 +261,7 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 - Final production domain and managed-extension distribution timing.
 - Temporary initial passwords for the canonical ADMIN and TEAM bootstrap, supplied through Railway and removed after one successful deployment.
 - A redacted example of the actual transcript-delivery email body/attachments so the Gmail extractor can be finalized without over-broad mailbox access.
+- Email Communication Coaching retention/deletion period, management visibility, final payload size limits, and the canonical outbound submission route/response contract.
 
 ## Final integration status
 

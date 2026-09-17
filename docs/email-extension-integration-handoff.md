@@ -2,7 +2,74 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), and `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery). Initial handoff: `ae97860`.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery), and `2d16e1b` (new-outbound-email coaching capture boundary). Initial handoff: `ae97860`.
+
+### Email Communication Coaching — extension capture boundary
+
+#### What was built
+
+- Passive, capture-phase observation of a trusted human click on Gmail's actual Send control. The handler reads the final compose state synchronously before Gmail can remove the compose, does not await network work, and never cancels, delays, triggers, or alters Gmail Send.
+- Current-state capture for New Compose, Reply, Reply All, and Forward metadata: actual detected authorized From address, all currently represented To/Cc/Bcc addresses, current subject, current authored body, bounded thread context, conversation/compose references, and observation timestamp.
+- Independent per-compose assistance lineage: whether AMM Style or Zac's Edit was requested, whether a suggestion was accepted, whether the accepted text was edited afterward, displayed warning codes, and whether a question-coverage warning was displayed. Original drafts and suggestions remain only in compose-scoped memory and are not included in the outbound payload.
+- Backend-controlled `emailCoachingEnabled` configuration. Missing or non-boolean configuration defaults off. The settings page discloses the feature, its backend-controlled status, its new-email-only scope, and that AMM Voice never sends mail.
+- `ExtensionApiClient.submitOutboundEmailForCoaching(payload)` centralizes the future endpoint. Its path is constructor-injected and intentionally absent until Core Platform supplies the canonical route; the current production composition therefore cannot upload coaching messages.
+- Conceptual telemetry events use the existing privacy-minimized interface: `email_sent_observed`, `email_coaching_submission_started`, `email_coaching_submission_succeeded`, and `email_coaching_submission_failed`. No email content or addresses enter extension telemetry.
+
+#### Send-safety guarantees
+
+- The extension never clicks, dispatches, or simulates Gmail Send and never calls `preventDefault` or `stopPropagation` in the Send observer.
+- Capture and submission failures are swallowed from Gmail's event path. No modal or compose error is shown after Send.
+- Capture reads the final values at the trusted click, not stale values from the rewrite request.
+- The observer never changes recipients, From, subject, body, signature, quoted history, or Gmail UI state.
+- A strict sender check drops capture when the From address is missing, ambiguous, unauthorized, or outside the backend-provided sender list.
+
+#### Privacy, history, deduplication, and retry
+
+- There is no historical Sent-mail access, Sent-folder crawl, Gmail API, Google OAuth, Google Cloud, or background import. Coaching begins only for new outbound business messages after the backend enables it.
+- `finalBody` is the authored outgoing body with common signature and quoted-history nodes excluded. Recent thread context is separate and remains bounded to six messages / 20,000 characters.
+- Complete originals and suggestions are never persisted to Chrome storage. The final payload exists only in memory/runtime messaging for the immediate submission attempt.
+- Each observed event gets a random `eventId`; the client sends it as `x-idempotency-key`. A compose-local content fingerprint suppresses the same snapshot for 15 seconds, covering duplicate DOM/event delivery while allowing a corrected second Send attempt when recipients or content change.
+- Network/server failures receive zero background retries and no persistent raw-body queue. The event is dropped after the immediate attempt. The existing API client may perform its single access-token refresh retry after HTTP 401; no other retry occurs.
+
+#### Required Core Platform contract — not yet implemented
+
+`GET /api/extension/config` must return an explicit boolean `emailCoachingEnabled` alongside the authenticated human and authorized sender addresses. Missing/false disables capture.
+
+Core Platform must select and inject one authenticated POST route into `ExtensionApiClient.outboundCoachingPath`. Expected request body:
+
+```ts
+{
+  eventId: string;
+  observedAt: string;
+  composeId: string;
+  composeMode: "new_compose" | "reply" | "reply_all" | "forward" | "unknown";
+  senderAddress: string;
+  recipientAddresses: string[];
+  subject: string;
+  finalBody: string;          // authored body; signature/quote excluded
+  conversationRef?: string;
+  threadContext?: string;     // bounded
+  assistance: {
+    ammStyleUsed: boolean;
+    zacsEditUsed: boolean;
+    rewriteAccepted: boolean;
+    rewriteModifiedAfterward: boolean;
+    warningsDisplayed: string[];
+    questionCoverageWarningDisplayed: boolean;
+  };
+}
+```
+
+The access token, not the request body, identifies `authenticatedUser`. The backend must recheck the enablement policy and sender permission, deduplicate by `eventId`/`x-idempotency-key`, validate size/schema, apply retention/privacy policy, and return `{ accepted: true }` for a successful handoff.
+
+#### Verification and limitations
+
+- `node --test extension/tests/*.test.cjs`: 39/39 passed.
+- All extension JavaScript passed `node --check`; manifest and rewrite fixtures parse successfully.
+- Tests cover New Compose, Reply, Reply All, Forward, both authorized senders, unauthorized sender rejection, post-AMM-Style and post-Zac's-Edit manual edits, two compose windows, toolbar/larger-subtree state recovery, capture/backend failure safety, deduplication, no Send trigger, credential/payload privacy, policy-disabled capture, disclosure, and absence of historical/Gmail API access.
+- Canonical backend config/route, persistence, analysis, permissions, retention, analytics storage, and portal reporting are not implemented here. No end-to-end production coaching claim is made.
+- Gmail selectors remain undocumented. Real installed-Chrome testing must verify recipients and From detection in all modes, toolbar/subtree rebuilds immediately before Send, multiple windows, aliases, Bcc-only mail, and attachment-only mail.
+- The MVP observes trusted Send-button clicks. Keyboard-only send shortcuts are not captured until Gmail's confirmed-send lifecycle can be observed without recording canceled confirmation prompts.
 
 ### Beta validation continuation
 
@@ -62,6 +129,7 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e
 - `dev-harness.html` provides mock results, review notes, warnings, and configuration.
 - Telemetry is a no-op; no competing analytics database or endpoint was added.
 - `submitFeedback` exists at the API boundary but canonical feedback wiring is unavailable.
+- Outbound coaching capture is off unless the backend explicitly returns `emailCoachingEnabled: true`; the canonical submission route is not yet supplied or wired.
 - Live Gmail new-compose inspection verified the `g_editable="true"` draft body, a visible `.aDh` panel mount, the subject field, and fail-closed From detection. Reply, reply-all, forward, changed From, and installed-extension behavior remain.
 
 ### Canonical native-auth compatibility
@@ -70,7 +138,7 @@ The extension provider targets `da95707`: email/password login, `chrome.storage.
 
 ### Verification
 
-- `node --test extension/tests/*.test.cjs`: 28 tests passed.
+- `node --test extension/tests/*.test.cjs`: 39 tests passed.
 - All extension JavaScript passed `node --check`.
 - Manifest and the 19-scenario fixture corpus parse as JSON.
 - Static tests guard multiple-compose isolation, sender fallback, thread limits, question display, session-only auth behavior, draft extraction, privacy-safe telemetry, and absence of Gmail Send interaction.
@@ -83,6 +151,7 @@ The extension provider targets `da95707`: email/password login, `chrome.storage.
 - Recent visible message extraction may need refinement for clipped messages, pop-out compose, unusual layouts, or multiple open threads.
 - Signature/quote preservation covers common `.gmail_signature`, `.gmail_quote`, and smart-signature nodes; real Gmail fixtures are still required.
 - Question coverage is a lightweight local review signal, not a guarantee that a reply fully answers a question.
+- Trusted Send-button observation needs installed-Gmail verification; keyboard-only Send is intentionally deferred.
 
 ### Remaining integration dependencies
 
@@ -90,6 +159,7 @@ The extension provider targets `da95707`: email/password login, `chrome.storage.
 - Verify login, refresh rotation, logout/revocation, config, and sender authorization against the deployed backend.
 - Run the real Gmail matrix: new compose, reply, reply all, forward, changed/collapsed From, shared sender, and multiple windows.
 - Approve and connect canonical feedback/telemetry semantics.
+- Core Platform must add the explicit coaching enablement field, canonical authenticated/idempotent submission route, server-side sender-policy recheck, persistence/retention rules, analysis workflow, and response contract described above.
 - Prepare stable extension ID, CORS origin, store artwork/listing, permission/privacy disclosure, signing, and release QA.
 
 ## What was built
