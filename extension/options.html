@@ -12,6 +12,8 @@
       <section aria-labelledby="connection-title"><h2 id="connection-title">Connection</h2>
         <label>Backend environment<select id="environment"><option value="production">Production</option><option value="local">Local development</option></select></label>
         <label>Backend URL<input id="backend" type="url" spellcheck="false"></label>
+        <label>Email<input id="email" type="email" autocomplete="username"></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password"></label>
         <label class="check development-only"><input id="development-mode" type="checkbox"> Use local mock authentication and sender identities</label>
         <p class="helper development-only">Mock authentication is permitted only for localhost and never stores a real secret.</p>
       </section>

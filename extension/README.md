@@ -39,13 +39,13 @@ AMM Voice attempts to read the current Gmail From address for new compose, reply
 
 ## Auth and API boundaries
 
-`ExtensionAuthProvider` exposes `signIn`, `signOut`, `getAccessToken`, and `getCurrentUser`. `BackendExtensionAuthProvider` adapts the existing backend flow without making it a UI dependency. `DevelopmentAuthProvider` supplies a local mock only when the backend is `localhost` or `127.0.0.1`.
+`ExtensionAuthProvider` exposes `signIn`, `signOut`, `getAccessToken`, and `getCurrentUser`. `NativeExtensionAuthProvider` adapts the canonical AMM Voice email/password login, refresh rotation, and logout contract. Access/refresh tokens and the current public user live in `chrome.storage.session`; passwords are never stored. `DevelopmentAuthProvider` supplies a local mock only when the backend is `localhost` or `127.0.0.1`.
 
 `ExtensionApiClient` centralizes current-user/configuration, authorized-sender, rewrite, retry, and future feedback operations. The canonical auth and feedback adapters remain final-integration work.
 
 ## Unpacked installation
 
-1. Configure the backend using `docs/extension-setup.md`.
+1. Configure the canonical native-auth backend using the latest `docs/extension-setup.md` from `main`.
 2. Open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
 3. Select this `extension` directory.
 4. Open the extension settings, confirm the backend environment/URL, and sign in.
@@ -85,7 +85,7 @@ Gmail has no stable public DOM contract. The adapter currently relies on compose
 Before packaging:
 
 - complete real Gmail tests across new compose, reply, reply all, forward, changed From, shared sender, collapsed From, and multiple windows;
-- finalize the canonical native auth adapter and remove any obsolete auth flow code;
+- merge the extension UI branch with canonical native-auth commit `da95707` and verify login, access-token refresh rotation, logout, and revocation end to end;
 - stabilize the extension ID and production redirect configuration;
 - replace broad assumptions with selector fixtures captured from supported Gmail layouts;
 - add icons/store artwork, a privacy disclosure, permission rationale, support information, and release signing;

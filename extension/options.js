@@ -2,9 +2,9 @@ const DEFAULT_BACKEND = "https://ammserver-production.up.railway.app";
 const LOCAL_BACKEND = "http://localhost:3000";
 const fields = {
   backend: document.querySelector("#backend"), environment: document.querySelector("#environment"), defaultAction: document.querySelector("#default-action"),
-  showReview: document.querySelector("#show-review"), autoSender: document.querySelector("#auto-sender"), developmentMode: document.querySelector("#development-mode"), status: document.querySelector("#status")
+  email: document.querySelector("#email"), password: document.querySelector("#password"), showReview: document.querySelector("#show-review"), autoSender: document.querySelector("#auto-sender"), developmentMode: document.querySelector("#development-mode"), status: document.querySelector("#status")
 };
-async function send(type) { const response = await chrome.runtime.sendMessage({ type }); if (!response?.ok) throw new Error(response?.error || "Request failed."); return response.result; }
+async function send(message) { const response = await chrome.runtime.sendMessage(message); if (!response?.ok) throw new Error(response?.error || "Request failed."); return response.result; }
 function environmentChanged() { const local = fields.environment.value === "local"; document.querySelectorAll(".development-only").forEach((node) => { node.hidden = !local; }); if (document.activeElement === fields.environment) fields.backend.value = local ? LOCAL_BACKEND : DEFAULT_BACKEND; if (!local) fields.developmentMode.checked = false; }
 async function load() {
   const value = await chrome.storage.local.get(["backendUrl", "backendEnvironment", "defaultAction", "showZacReview", "autoDetectSender", "developmentMode"]);
@@ -17,6 +17,6 @@ async function save() {
 }
 fields.environment.addEventListener("change", environmentChanged);
 document.querySelector("#save").addEventListener("click", () => save().catch((error) => { fields.status.textContent = error.message; }));
-document.querySelector("#signin").addEventListener("click", async () => { try { await save(); const config = await send("SIGN_IN"); fields.status.textContent = `Signed in as ${config.authenticatedUser}. Authorized From addresses: ${(config.senderAddresses || []).join(", ") || "none"}.`; } catch (error) { fields.status.textContent = error.message; } });
-document.querySelector("#signout").addEventListener("click", async () => { try { await send("SIGN_OUT"); fields.status.textContent = "Signed out."; } catch (error) { fields.status.textContent = error.message; } });
+document.querySelector("#signin").addEventListener("click", async () => { try { await save(); fields.status.textContent = "Signing in…"; const config = await send({ type: "SIGN_IN", email: fields.email.value, password: fields.password.value }); fields.password.value = ""; fields.status.textContent = `Signed in as ${config.authenticatedUser}. Authorized From addresses: ${(config.senderAddresses || []).join(", ") || "none"}.`; } catch (error) { fields.password.value = ""; fields.status.textContent = error.message; } });
+document.querySelector("#signout").addEventListener("click", async () => { try { await send({ type: "SIGN_OUT" }); fields.status.textContent = "Signed out."; } catch (error) { fields.status.textContent = error.message; } });
 load().catch((error) => { fields.status.textContent = error.message; });

@@ -45,7 +45,7 @@
     state.busy = busy; state.ui.ammButton.disabled = busy; state.ui.zacButton.disabled = busy; state.ui.continueButton.disabled = busy; state.ui.retry.disabled = busy;
     state.ui.status.className = `amm-voice-status${busy ? " amm-voice-status--loading" : ""}`; state.ui.status.textContent = label || "";
   }
-  function showError(state, error) { const view = Core.classifyError(error); setBusy(state, false); state.ui.status.className = "amm-voice-status amm-voice-status--error"; state.ui.status.textContent = view.message; state.ui.continueButton.hidden = false; state.ui.continueButton.textContent = view.code === "AUTH_REQUIRED" ? "Sign in and retry" : "Try again"; }
+  function showError(state, error) { const view = Core.classifyError(error); state.errorCode = view.code; setBusy(state, false); state.ui.status.className = "amm-voice-status amm-voice-status--error"; state.ui.status.textContent = view.message; state.ui.continueButton.hidden = false; state.ui.continueButton.textContent = view.code === "AUTH_REQUIRED" ? "Open sign-in settings" : "Try again"; }
   function renderSender(state, senderState) {
     const ui = state.ui; ui.sender.replaceChildren(); senderState.options.forEach((address) => { const option = element("option", "", address); option.value = address; ui.sender.append(option); });
     ui.senderRow.hidden = !senderState.needsSelection; state.selectedSender = senderState.sender;
@@ -61,11 +61,9 @@
     setBusy(state, false, state.context.thread ? "Review the suggestion before replacing your draft." : "No thread context was detected. Review this suggestion carefully."); ui.suggested.focus();
   }
 
-  async function configFor(state) {
-    try { return await call("GET_CONFIG"); } catch (error) { if (!/SIGN_IN_REQUIRED|AUTHENTICATION_EXPIRED/.test(error.message)) throw error; return call("SIGN_IN"); }
-  }
+  async function configFor(_state) { return call("GET_CONFIG"); }
   async function runRewrite(state, retry = false) {
-    if (state.busy) return; state.context = Gmail.composeContext(state.compose); state.settings = await extensionSettings(); state.ui.panel.hidden = false; state.ui.title.textContent = state.mode === "zacs_edit" ? "Zac's Edit" : "AMM Style"; state.ui.subtitle.textContent = state.mode === "zacs_edit" ? "A deeper customer-service review for clarity, questions, promises, and next steps." : "A polished Authentic Moments response with warmth, clarity, and facts intact."; state.ui.result.hidden = true; state.ui.footer.hidden = true; state.ui.continueButton.hidden = true;
+    if (state.busy) return; state.errorCode = ""; state.context = Gmail.composeContext(state.compose); state.settings = await extensionSettings(); state.ui.panel.hidden = false; state.ui.title.textContent = state.mode === "zacs_edit" ? "Zac's Edit" : "AMM Style"; state.ui.subtitle.textContent = state.mode === "zacs_edit" ? "A deeper customer-service review for clarity, questions, promises, and next steps." : "A polished Authentic Moments response with warmth, clarity, and facts intact."; state.ui.result.hidden = true; state.ui.footer.hidden = true; state.ui.continueButton.hidden = true;
     if (!state.context.body || !state.context.draft) { showError(state, new Error("NO_DRAFT")); return; }
     try {
       setBusy(state, true, state.mode === "zacs_edit" ? "Analyzing the conversation…" : "Polishing your draft…"); const config = await configFor(state); state.config = config;
@@ -78,7 +76,7 @@
     } catch (error) { showError(state, error); }
   }
   async function continueWithSender(state) {
-    if (!state.selectedSender) { showError(state, new Error("SENDER_REQUIRED")); return; }
+    if (!state.selectedSender) { showError(state, new Error("SENDER_REQUIRED")); return; } state.errorCode = "";
     state.context = Gmail.composeContext(state.compose); setBusy(state, true, state.mode === "zacs_edit" ? "Analyzing the conversation…" : "Polishing your draft…"); state.ui.continueButton.hidden = true;
     const payload = { mode: state.mode, draft: state.context.draft, subject: state.context.subject, thread: state.context.thread, senderAddress: state.selectedSender }; if (state.context.recipientAddress) payload.recipientAddress = state.context.recipientAddress; if (state.context.conversationId) payload.conversationId = state.context.conversationId; state.payload = payload;
     try { emit(state.mode === "zacs_edit" ? "zacs_edit_requested" : "amm_style_requested", { mode: state.mode, senderDetected: false, questionCount: Core.extractQuestions(state.context.thread).length }); renderResult(state, await call("REWRITE", payload)); } catch (error) { showError(state, error); }
@@ -87,7 +85,7 @@
   function wireState(compose, ui) {
     const state = { ...Core.createComposeSession(compose.getAttribute("data-thread-perm-id") || ""), compose, ui, settings: Core.SETTINGS_DEFAULTS };
     ui.ammButton.addEventListener("click", () => { state.mode = "amm_style"; emit("extension_opened", { mode: state.mode }); runRewrite(state); }); ui.zacButton.addEventListener("click", () => { state.mode = "zacs_edit"; emit("extension_opened", { mode: state.mode }); runRewrite(state); });
-    ui.close.addEventListener("click", () => closePanel(state)); ui.cancel.addEventListener("click", () => closePanel(state)); ui.sender.addEventListener("change", () => { state.selectedSender = ui.sender.value; }); ui.continueButton.addEventListener("click", () => state.ui.senderRow.hidden ? runRewrite(state) : continueWithSender(state));
+    ui.close.addEventListener("click", () => closePanel(state)); ui.cancel.addEventListener("click", () => closePanel(state)); ui.sender.addEventListener("change", () => { state.selectedSender = ui.sender.value; }); ui.continueButton.addEventListener("click", () => { if (state.errorCode === "AUTH_REQUIRED") { call("OPEN_SETTINGS").catch(() => {}); return; } state.ui.senderRow.hidden ? runRewrite(state) : continueWithSender(state); });
     ui.retry.addEventListener("click", () => runRewrite(state, true)); ui.replace.addEventListener("click", () => { if (!state.output?.rewrittenText) return; state.undoSnapshot = Gmail.replaceDraftBody(Gmail.findBody(compose), state.output.rewrittenText); ui.undo.disabled = false; ui.status.textContent = "Draft replaced. Review it in Gmail before sending."; emit("rewrite_accepted", { mode: state.mode }); });
     ui.undo.addEventListener("click", () => { if (Gmail.restoreDraftBody(Gmail.findBody(compose), state.undoSnapshot)) { state.undoSnapshot = null; ui.undo.disabled = true; ui.status.textContent = "The previous draft has been restored."; emit("rewrite_undone", { mode: state.mode }); } });
     ui.panel.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); closePanel(state); (state.mode === "zacs_edit" ? ui.zacButton : ui.ammButton).focus(); } });
