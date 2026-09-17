@@ -28,5 +28,5 @@ async function rewrite(compose, button) {
     }
   } finally { button.disabled = false; button.textContent = "AMM Voice"; }
 }
-function enhance(compose) { if (compose.querySelector(".amm-voice-button")) return; const toolbar = compose.querySelector('[role="toolbar"]'); if (!toolbar) return; const button = document.createElement("button"); button.type = "button"; button.className = "amm-voice-button"; button.textContent = "AMM Voice"; button.addEventListener("click", () => rewrite(compose, button).catch((error) => alert(error.message))); toolbar.prepend(button); }
+function enhance(compose) { if (compose.querySelector(".amm-voice-button") || !compose.querySelector('[contenteditable="true"][role="textbox"]')) return; const toolbar = compose.querySelector('[role="toolbar"]'); if (!toolbar) return; const button = document.createElement("button"); button.type = "button"; button.className = "amm-voice-button"; button.textContent = "AMM Voice"; button.addEventListener("click", () => rewrite(compose, button).catch((error) => alert(error.message))); toolbar.prepend(button); }
 function scan() { document.querySelectorAll('[role="dialog"]').forEach(enhance); } new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true }); scan();

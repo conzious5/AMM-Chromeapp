@@ -20,7 +20,11 @@ pnpm test
 pnpm dev
 ```
 
-The API requires `Authorization: Bearer <DEV_AUTH_TOKEN>` on `POST /api/rewrite`. `GET /health` is public.
+Local API testing can use `Authorization: Bearer <DEV_AUTH_TOKEN>` on `POST /api/rewrite`. The Chrome extension authenticates each employee through Google and uses a short-lived signed backend token. `GET /health` is public.
+
+## Chrome extension MVP
+
+The installable Manifest V3 extension lives in `extension/`. It keeps the authenticated employee separate from Gmail's selected From address, validates shared senders through backend permissions, and never sends mail automatically. See [docs/extension-setup.md](docs/extension-setup.md).
 
 See [docs/architecture.md](docs/architecture.md), [docs/corpus-import.md](docs/corpus-import.md), and [docs/security-and-privacy.md](docs/security-and-privacy.md).
 

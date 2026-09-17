@@ -30,4 +30,14 @@ describe("API", () => {
     expect(response.statusCode).toBe(401);
     await app.close();
   });
+  it("authorizes sender addresses separately from the authenticated human", async () => {
+    const config = { ...testConfig, USER_SENDER_PERMISSIONS_JSON: JSON.stringify({ "development@amm-voice.local": ["hello@authentic-moments.com"] }) };
+    const app = await buildApp({ config, auth: new DevelopmentTokenAuth(config.DEV_AUTH_TOKEN), rewriteService: new RewriteService(repository, model), analytics: new AnalyticsRepository() });
+    const headers = { authorization: `Bearer ${config.DEV_AUTH_TOKEN}` };
+    const identity = await app.inject({ method: "GET", url: "/api/extension/config", headers });
+    expect(identity.json()).toMatchObject({ authenticatedUser: "development@amm-voice.local", senderAddresses: ["hello@authentic-moments.com"] });
+    const response = await app.inject({ method: "POST", url: "/api/rewrite", headers, payload: { mode: "amm_style", draft: "Hello", subject: "", thread: "", senderAddress: "hello@authentic-moments.com" } });
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  });
 });
