@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AMM Voice extension harness</title><link rel="stylesheet" href="content-style.css"><style>body{background:#eef2f7;color:#172554;font:15px/1.5 Arial,sans-serif;margin:0;padding:28px}.intro{margin:0 auto 22px;max-width:980px}.harness-grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));margin:auto;max-width:980px}.compose{background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 10px 24px #0f172a12;padding:14px}.compose input{border:0;border-bottom:1px solid #e2e8f0;font:inherit;padding:8px;width:100%}.compose [role=textbox]{min-height:150px;padding:12px;white-space:pre-wrap}.gmail_signature{border-top:1px solid #e2e8f0;color:#64748b;margin-top:12px;padding-top:8px}.toolbar{border-top:1px solid #e2e8f0;padding-top:10px}.thread{display:none}</style></head>
+  <body>
+    <div class="intro"><p>Local, backend-free interaction harness</p><h1>Two independent Gmail compose windows</h1><p>Use AMM Style in one and Zac's Edit in the other. Verify sender fallback, warnings, replacement, signature preservation, Undo, keyboard focus, and independent state.</p></div>
+    <div class="thread"><div class="a3s aiL">Client: When will the teaser be ready? Can we buy raw footage? Do you need another song?</div></div>
+    <main class="harness-grid">
+      <section class="compose" role="dialog" data-thread-perm-id="compose-a"><input name="subjectbox" value="Teaser update"><div aria-label="From: hello@authentic-moments.com"></div><div email="client-a@example.com"></div><div contenteditable="true" role="textbox">It should be soon.<div class="gmail_signature">Cylina<br>Authentic Moments</div></div><div role="toolbar" class="toolbar"></div></section>
+      <section class="compose" role="dialog" data-thread-perm-id="compose-b"><input name="subjectbox" value="A few questions"><div aria-label="From address unavailable"></div><div email="client-b@example.com"></div><div contenteditable="true" role="textbox">The teaser is in progress and raw footage is available.<div class="gmail_signature">Cylina<br>Authentic Moments</div></div><div role="toolbar" class="toolbar"></div></section>
+    </main>
+    <script src="dev-harness.js"></script><script src="core.js"></script><script src="compose-adapter.js"></script><script src="content-script.js"></script>
+  </body>
+</html>

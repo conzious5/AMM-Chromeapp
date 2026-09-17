@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "AMM Voice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Authentic Moments client-email writing assistant.",
   "permissions": ["storage", "identity"],
   "host_permissions": ["https://mail.google.com/*", "https://ammserver-production.up.railway.app/*", "http://localhost:3000/*"],
   "background": { "service_worker": "service-worker.js" },
-  "content_scripts": [{ "matches": ["https://mail.google.com/*"], "js": ["content-script.js"], "css": ["content-style.css"], "run_at": "document_idle" }],
+  "content_scripts": [{ "matches": ["https://mail.google.com/*"], "js": ["core.js", "compose-adapter.js", "content-script.js"], "css": ["content-style.css"], "run_at": "document_idle" }],
   "options_page": "options.html",
   "action": { "default_title": "AMM Voice settings" }
 }
