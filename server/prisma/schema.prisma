@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEAM
+}
+
+enum DataSource {
+  LIVE
+  HISTORICAL_CORPUS
+}
+
+model AnalyticsEvent {
+  id                      String     @id @default(cuid())
+  requestId               String     @unique
+  occurredAt              DateTime   @default(now())
+  actorId                 String
+  authenticatedUser       String?
+  senderAddress           String?
+  recipientAddress        String?
+  mode                    String
+  source                  DataSource @default(LIVE)
+  conversationRef         String?
+  scenarioCategory        String?
+  clientContactCategory   String?
+  latencyMs               Int?
+  model                   String?
+  inputTokens             Int?
+  outputTokens            Int?
+  accepted                Boolean?
+  modifiedAfterGeneration Boolean?
+  regenerated             Boolean   @default(false)
+  questionCount           Int?
+  questionsAnswered       Int?
+  questionsMissed         Int?
+  warnings                String[]
+  interventions           String[]
+  frictionSignals         String[]
+  attentionSignals        String[]
+
+  @@index([occurredAt])
+  @@index([mode, occurredAt])
+  @@index([authenticatedUser, occurredAt])
+  @@index([senderAddress, occurredAt])
+  @@index([authenticatedUser, senderAddress, occurredAt])
+  @@index([scenarioCategory])
+}
+
+model ConversationSignal {
+  id                 String     @id @default(cuid())
+  conversationRef    String
+  source             DataSource @default(LIVE)
+  occurredAt         DateTime   @default(now())
+  clientLabel        String?
+  category           String?
+  status             String     @default("open")
+  reason             String
+  followUpCount      Int        @default(0)
+  lastInteractionAt  DateTime?
+  attentionRequired  Boolean    @default(false)
+  classificationNote String?
+
+  @@index([attentionRequired, occurredAt])
+  @@index([conversationRef])
+}
+
+model Report {
+  id          String     @id @default(cuid())
+  periodType  String
+  periodStart DateTime
+  periodEnd   DateTime
+  source      DataSource @default(LIVE)
+  status      String     @default("generated")
+  content     Json
+  createdAt   DateTime   @default(now())
+}
+
+model ProfileVersion {
+  id          String   @id @default(cuid())
+  profileType String
+  version     Int
+  summary     String
+  content     Json
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@unique([profileType, version])
+}
+
+model TrainingCandidate {
+  id          String   @id @default(cuid())
+  category    String
+  status      String   @default("needs_review")
+  sourceRef   String?
+  metadata    Json
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  occurredAt DateTime @default(now())
+  actorEmail String
+  action     String
+  targetType String?
+  targetRef  String?
+  metadata   Json?
+
+  @@index([occurredAt])
+}

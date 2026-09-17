@@ -1,3 +1,13 @@
 # AMM Voice Chrome extension
 
-Phase 2 will add the Manifest V3 Gmail content script and preview UI here. The extension will remain a thin client: it will gather the current draft and minimal visible thread context, call the authenticated backend, show a preview, and require an explicit Replace Draft action. It will never contain an OpenAI API key or send email automatically.
+Manifest V3 Gmail MVP. The extension is a thin client: it detects compose context, asks the authenticated backend for permitted sender addresses, requests a rewrite, previews the result, and replaces the draft only after explicit confirmation. It never sends email and contains no OpenAI key.
+
+## Unpacked installation
+
+1. Configure the backend using `docs/extension-setup.md`.
+2. Open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
+3. Select this `extension` directory.
+4. Open the extension's options page, confirm the backend URL, and select **Sign in with Google**.
+5. Reload Gmail.
+
+Employee identity comes from Google authentication. The Gmail From address is detected separately and validated against backend-provided sender permissions.

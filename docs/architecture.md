@@ -18,7 +18,22 @@ Corpus processing is intentionally separate. A Takeout MBOX file is parsed local
 - `LanguageModel` hides OpenAI, which also makes the rewrite and evaluation logic testable without network calls.
 - Style profiles never contain current prices, turnaround times, staffing, or policies.
 - `current-business-rules.json` is the only approved mutable business-fact source in the MVP.
-- The future extension only gathers minimal visible context and presents a preview. It never sends mail automatically.
+- The Manifest V3 extension only gathers minimal visible compose/thread context and presents a preview. It never sends mail automatically.
+- Authentication identifies the human employee. The Gmail From address is separate request context and never selects or changes the authenticated user.
+- Chrome-specific Gmail DOM extraction lives only in the extension. Authentication policy, sender permissions, prompts, analytics, voice profiles, and Zac's Edit remain backend-owned so a future Workspace Add-on can reuse them.
+
+## Identity and email context
+
+Every live rewrite can carry four independent dimensions:
+
+- `authenticatedUser`: derived only from the verified Google login token;
+- `senderAddress`: detected from the active Gmail compose From selector and validated against backend permissions;
+- `recipientAddress`: detected from the active compose recipient;
+- `conversationId`: an opaque Gmail/thread reference when available.
+
+For Cylina, `authenticatedUser` remains `cylina@authentic-moments.com` whether Gmail sends from `cylina@authentic-moments.com` or `hello@authentic-moments.com`. Shared addresses are resources, not employee identities. Analytics may filter and group by human user, sender address, or the pair.
+
+Employees install the same extension build. Google authentication and backend configuration determine their role and permitted sender addresses; no per-employee source edit is required.
 
 ## Prompt priority
 

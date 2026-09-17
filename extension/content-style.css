@@ -1,0 +1,2 @@
+.amm-voice-button { border: 0; border-radius: 6px; background: #1e40af; color: white; cursor: pointer; font: 600 13px/1 system-ui,sans-serif; margin: 0 8px 0 0; padding: 9px 12px; }
+.amm-voice-button:hover { background: #1e3a8a; } .amm-voice-button:disabled { cursor: wait; opacity: .65; }

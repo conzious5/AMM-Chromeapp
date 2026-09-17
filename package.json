@@ -5,6 +5,7 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "build": "pnpm --filter @amm/server build",
+    "build:portal": "pnpm --filter @amm/portal build",
     "dev": "pnpm --filter @amm/server dev",
     "test": "pnpm --filter @amm/server test",
     "typecheck": "pnpm --filter @amm/server typecheck",

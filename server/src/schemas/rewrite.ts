@@ -6,7 +6,9 @@ export const rewriteRequestSchema = z.object({
   subject: z.string().trim().max(500).default(""),
   thread: z.string().trim().max(30_000).default(""),
   recipientName: z.string().trim().max(200).optional(),
-  sender: z.string().trim().max(320).optional()
+  senderAddress: z.string().trim().email().max(320).optional(),
+  recipientAddress: z.string().trim().email().max(320).optional(),
+  conversationId: z.string().trim().max(500).optional()
 }).strict();
 
 export type RewriteRequest = z.infer<typeof rewriteRequestSchema>;

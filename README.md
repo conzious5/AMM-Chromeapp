@@ -23,3 +23,7 @@ pnpm dev
 The API requires `Authorization: Bearer <DEV_AUTH_TOKEN>` on `POST /api/rewrite`. `GET /health` is public.
 
 See [docs/architecture.md](docs/architecture.md), [docs/corpus-import.md](docs/corpus-import.md), and [docs/security-and-privacy.md](docs/security-and-privacy.md).
+
+## Management portal
+
+The same Railway service hosts the authenticated React portal and Fastify API. Google OAuth is allowlisted with `ADMIN_EMAILS` and `TEAM_EMAILS`; analytics are stored as structured, privacy-minimized PostgreSQL records through Prisma. See [docs/portal-setup.md](docs/portal-setup.md).

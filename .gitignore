@@ -4,6 +4,7 @@ dist/
 .env
 .DS_Store
 coverage/
+*.tsbuildinfo
 server/data/private/
 server/data/analysis-output/
 *.mbox

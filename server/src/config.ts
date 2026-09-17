@@ -12,7 +12,16 @@ const envSchema = z.object({
   MAX_DRAFT_CHARS: z.coerce.number().int().positive().default(12_000),
   MAX_THREAD_CHARS: z.coerce.number().int().positive().default(30_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
-  RATE_LIMIT_WINDOW: z.string().default("1 minute")
+  RATE_LIMIT_WINDOW: z.string().default("1 minute"),
+  DATABASE_URL: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
+  SESSION_SECRET: z.string().min(32).default("development-session-secret-change-me"),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  ADMIN_EMAILS: z.string().default(""),
+  TEAM_EMAILS: z.string().default(""),
+  EXTENSION_IDS: z.string().default(""),
+  USER_SENDER_PERMISSIONS_JSON: z.string().default("{}")
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
