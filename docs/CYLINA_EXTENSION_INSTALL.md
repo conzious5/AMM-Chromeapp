@@ -1,10 +1,10 @@
 # Install the AMM Voice beta in Chrome
 
-AMM Voice Beta v0.1.1 is an unpacked Chrome extension. It does not require Node, npm, pnpm, Git, or terminal access.
+AMM Voice Beta v0.1.2 is an unpacked Chrome extension. It does not require Node, npm, pnpm, Git, or terminal access.
 
 ## Install
 
-1. Download `AMM-Voice-Beta-v0.1.1.zip`.
+1. Download `AMM-Voice-Beta-v0.1.2.zip`.
 2. Unzip it.
 3. Move the resulting `amm-voice-extension` folder somewhere permanent. Chrome must be able to find the same folder after installation and updates.
 4. Open Chrome.
@@ -50,5 +50,6 @@ If Chrome reports that the extension folder is missing, remove the broken AMM Vo
 3. Click **AMM Style** and confirm a suggestion appears without changing the draft automatically.
 4. Click **Cancel**, then click **Zac's Edit** and confirm meaningful review notes appear when the draft contains a real client-service concern.
 5. Confirm the From-address selector offers only `cylina@authentic-moments.com` and `hello@authentic-moments.com` when automatic detection is unavailable.
+6. While a review panel is open, use a normal Gmail action that refreshes the compose controls (for example, reveal/hide formatting or recipient controls). Confirm AMM Style and Zac's Edit remain present or promptly reappear without changing the draft, sender, or review.
 
 If sign-in fails, the buttons do not appear after reloading Gmail, or an authorized From address is missing, stop and contact Zac rather than entering credentials anywhere else.

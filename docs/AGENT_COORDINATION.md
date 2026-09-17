@@ -7,7 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, native portal/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline through native-auth commit `da95707`. Extension/auth/identity work is described below. |
-| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, beta package/validation | Canonical `main` merged; extension hardened through v0.1.1 fetch hotfix `34bb946`. Canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach remain unchanged from `main`. |
+| `feature/extension-experience` | Chrome extension UI, Gmail compose experience, beta package/validation | Canonical `main` merged; extension hardened through v0.1.2 Gmail lifecycle fix `5132cb1`. Canonical server auth, Prisma, portal, analytics, Railway, and Meeting Coach remain unchanged from `main`. |
 | `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented through inbox-intake commit `7bb7d6b`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
@@ -35,8 +35,10 @@ Handoff: `docs/email-extension-integration-handoff.md`.
 - Final beta-validation pass merged canonical `main` through `e06498d`, strengthened only extension-owned auth/API failure handling and tests, prepared the v0.1.0 unpacked distribution/ZIP, and added Cylina's installation guide. Production health and invalid-login behavior are verified. Valid-user authentication and the real Gmail matrix remain blocked on human installation and private sign-in.
 - Installed-beta v0.1.0 exposed a Chrome WorkerGlobalScope `Illegal invocation` caused by detached native `fetch` references. The extension-owned v0.1.1 hotfix uses receiver-safe global fetch wrappers and preserves auth state for runtime/network failures; only an actual 401/403 refresh rejection becomes session expiration. No canonical auth, Prisma, Railway, portal, analytics, or Meeting Coach files were changed for this fix.
 - `v0.1.1-beta` is published from hotfix commit `34bb946` plus handoff commit `d70c8a7`: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.1-beta`. Asset SHA-256 `7049e2e9898619bd2972ad47c829030c2fa113a6ae8ee6b48b32b5a2158b83a1` was verified after downloading it from GitHub. Manual installed-beta retesting remains required.
+- Installed-beta v0.1.1 exposed a Gmail SPA lifecycle regression: replacing the compose toolbar removed AMM controls while the compose remained marked initialized. The extension-owned v0.1.2 fix separates known-compose state from attached-control state, reattaches the same shell after relevant DOM replacement, prevents duplicates, preserves per-compose state/drafts, isolates multiple compose windows, and cleans up closed compose state. It does not modify shared systems.
+- `v0.1.2-beta` is published from lifecycle commit `5132cb1`: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.2-beta`. Asset SHA-256 `42dc01c49f73b8fef5c017c9f5dbe751421afc7a32a9db74fef63574bce70d95` was verified after downloading it from GitHub. Automated extension coverage passes 28/28; manual installed-Chrome retesting remains required.
 
-Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, `afc8f45`, beta-validation merge `1b75312`, and v0.1.1 fetch hotfix `34bb946`; initial handoff commit `ae97860`.
+Authoritative continuation handoff: `docs/email-extension-integration-handoff.md` on `feature/extension-experience`; implementation commits `657c95f`, `6eb8e9e`, `2ebc687`, `afc8f45`, beta-validation merge `1b75312`, v0.1.1 fetch hotfix `34bb946`, and v0.1.2 lifecycle fix `5132cb1`; initial handoff commit `ae97860`.
 
 ### Management portal and native authentication — owner: main / commits `406c5a6`, `2a1b2ca`, `5cf7526`, `da95707`
 
