@@ -144,7 +144,9 @@ Production verification on 2026-09-16:
 - The public root rendered the native AMM Voice Email / Password / Remember me / Sign In form.
 - A deliberately nonexistent user received the generic “Invalid email or password” response.
 - Railway PostgreSQL lists `AuthSession`, `User`, and `UserSenderPermission`, confirming the native-auth migration was applied.
-- No bootstrap passwords were supplied, so the canonical login rows were intentionally not created during this deployment.
+- One-time bootstrap completed on 2026-09-16. `admin@authentic-moments.com` is active with `ADMIN`; `cylina@authentic-moments.com` is active with `TEAM`; and Cylina has both her personal and `hello@authentic-moments.com` sender permissions.
+- Sanitized live verification passed: health `200/ok`; invalid login `401`; both canonical logins `200`; ADMIN route as ADMIN `200`; ADMIN route as TEAM `403`; both logouts `204`; and both revoked sessions subsequently returned `401` from `/auth/me`.
+- It is safe to remove `BOOTSTRAP_ADMIN_PASSWORD` and `BOOTSTRAP_TEAM_PASSWORD`. The bootstrap is create-only by normalized unique email, so later restarts do not overwrite initialized users.
 
 ## Potential merge conflicts
 
@@ -152,7 +154,7 @@ Production verification on 2026-09-16:
 
 ## Remaining work
 
-- Run the one-time canonical-user bootstrap after Zac supplies the two temporary passwords; then remove both bootstrap variables.
+- Remove both one-time bootstrap variables and redeploy/restart; then confirm the persisted users remain unchanged.
 - Perform real portal and Gmail-extension login/revocation tests for both canonical users and both of Cylina’s sender addresses.
 - Add TOTP enrollment, verification, recovery codes, and admin recovery policy as the next auth-hardening feature.
 - Add portal analytics filter controls and replace remaining placeholder pages.
