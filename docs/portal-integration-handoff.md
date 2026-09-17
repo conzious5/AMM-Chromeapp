@@ -136,7 +136,15 @@ Validated after the native-auth refactor:
 - Prisma schema validation passes.
 - Extension service-worker/options JavaScript syntax checks pass.
 
-Production deployment and migration verification remain to be appended after Railway redeploy.
+Production verification on 2026-09-16:
+
+- Railway deployment `bf0faa25-ce43-4324-bce1-da3897245174` is Active and reported “Deployment successful” for `1e9ce2e`.
+- `PUBLIC_BASE_URL=https://ammserver-production.up.railway.app` is configured on the application service.
+- `https://ammserver-production.up.railway.app/health` returned `{"status":"ok"}`.
+- The public root rendered the native AMM Voice Email / Password / Remember me / Sign In form.
+- A deliberately nonexistent user received the generic “Invalid email or password” response.
+- Railway PostgreSQL lists `AuthSession`, `User`, and `UserSenderPermission`, confirming the native-auth migration was applied.
+- No bootstrap passwords were supplied, so the canonical login rows were intentionally not created during this deployment.
 
 ## Potential merge conflicts
 
@@ -144,7 +152,6 @@ Production deployment and migration verification remain to be appended after Rai
 
 ## Remaining work
 
-- Push `main`, set the exact `PUBLIC_BASE_URL`, redeploy Railway, and verify the native-auth migration and live routes.
 - Run the one-time canonical-user bootstrap after Zac supplies the two temporary passwords; then remove both bootstrap variables.
 - Perform real portal and Gmail-extension login/revocation tests for both canonical users and both of Cylina’s sender addresses.
 - Add TOTP enrollment, verification, recovery codes, and admin recovery policy as the next auth-hardening feature.

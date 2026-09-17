@@ -253,6 +253,6 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 
 ## Final integration status
 
-- Email extension/auth/identity/analytics foundation: native-auth implementation committed on `main` at `da95707`; local typecheck/build/tests pass. Railway redeploy, migration verification, exact `PUBLIC_BASE_URL`, one-time user bootstrap, and real portal/extension sign-in checks remain.
+- Email extension/auth/identity/analytics foundation: native-auth implementation and handoff are committed on `main` through `1e9ce2e`. Railway deployment `bf0faa25-ce43-4324-bce1-da3897245174` is Active; health, native login UI/rejection behavior, exact `PUBLIC_BASE_URL`, and the three native-auth database tables are verified. One-time user bootstrap and real approved-user portal/extension sign-in checks remain because temporary passwords were not supplied.
 - Meeting Coach: feature-complete on its branch at the domain/service level with shared-inbox intake boundary at `7bb7d6b`; live Gmail, shared-system integration, and transcript-content confirmation remain.
 - Canonical auth and its Prisma models are decided; Meeting Coach still requires final reconciliation for persistence, analytics, routes, portal navigation, Railway, and any unrelated future Google data integration.
