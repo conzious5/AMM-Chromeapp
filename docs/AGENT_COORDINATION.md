@@ -7,7 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, Google/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline. Extension/auth/identity work is described below. |
-| `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented with coordinated handoff at `5f44a96`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
+| `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented through inbox-intake commit `7bb7d6b`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
 
@@ -34,9 +34,10 @@ Handoff: `docs/email-extension-integration-handoff.md`.
 ### Meeting Coach — owner: `feature/meeting-coach`
 
 - Transcript parsing, speaker inference, question extraction, classification, evidence-grounded analysis, scoring, coaching reports, trends, goals, model adapter, repository/integration ports, tests, and evals.
+- Tested email-intake boundary for notes delivered to `hello@authentic-moments.com` with subjects shaped like `Notes: “Final Consultation - Alexis Legg and Authentic Moments” Sep 16, 2026.`; preserves Gmail message ID and extracts meeting metadata plus body/text-attachment content.
 - No shared auth, Prisma, route, analytics repository, portal shell, or Railway changes were made on the feature branch.
 
-Authoritative handoff on branch: `docs/meeting-coach-handoff.md` at `5f44a96`. Detailed integration log: `docs/meeting-coach-integration.md`. Schema proposal: `docs/meeting-coach-schema-proposal.md`.
+Authoritative handoff on branch: `docs/meeting-coach-handoff.md` through `7bb7d6b`. Detailed integration log: `docs/meeting-coach-integration.md`. Schema proposal: `docs/meeting-coach-schema-proposal.md`.
 
 ## Canonical architecture decisions
 
@@ -98,6 +99,8 @@ interface AuthPrincipal {
 ### Meeting Coach integration surface
 
 `feature/meeting-coach` exports its stable surface from `server/src/meeting-coach/index.ts`, including repository ports, `CurrentUserProvider`, `MeetingCoachAnalytics`, `NotificationService`, model adapter, analysis service, and report view model. Inspect the branch implementation before adapting it.
+
+It also exports `TranscriptMailboxSource` and `emailToTranscriptCandidate`. The final Gmail client should implement this boundary rather than placing Gmail API logic inside the analysis service.
 
 ## Shared data models
 
@@ -197,6 +200,7 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 ## Integration dependencies
 
 - Meeting Coach depends on final adapters for auth, persistence, analytics, routes, portal navigation, and optionally notifications/jobs.
+- Meeting Coach transcript intake depends on read access to mail delivered to `hello@authentic-moments.com`, idempotent processing keyed by Gmail message ID, and confirmation of whether real transcript content is in the email body, a text attachment, or a link.
 - Extension production sign-in depends on Google redirect registration, Railway environment configuration, and a stable Chrome extension ID.
 - Analytics deployment depends on running Prisma migrations.
 
@@ -208,9 +212,10 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 - Final production domain and managed-extension distribution timing.
 - Exact `ADMIN_EMAILS` and `TEAM_EMAILS` allowlists for the live portal.
 - Google OAuth web client credentials with the production portal and extension callbacks registered.
+- A redacted example of the actual transcript-delivery email body/attachments so the Gmail extractor can be finalized without over-broad mailbox access.
 
 ## Final integration status
 
 - Email extension/auth/identity/analytics foundation: committed on `main`; portal/API and PostgreSQL deployment are verified. Production Google OAuth, email allowlists, session secret, and extension-ID configuration remain.
-- Meeting Coach: feature-complete on its branch at the domain/service level with handoff commit `5f44a96`; shared-system integration remains.
+- Meeting Coach: feature-complete on its branch at the domain/service level with shared-inbox intake boundary at `7bb7d6b`; live Gmail, shared-system integration, and transcript-content confirmation remain.
 - Final reconciliation of auth, Prisma, analytics, routes, portal navigation, Railway, and Google integration has not been performed.
