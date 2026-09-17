@@ -252,6 +252,6 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 
 ## Final integration status
 
-- Email extension/auth/identity/analytics foundation: native-auth implementation and handoff are committed on `main`. The canonical ADMIN and TEAM users are initialized with correct roles and sender permissions. Both bootstrap variables were removed and a production restart preserved users, credentials, sender permissions, and database-backed sessions. Sanitized checks passed for invalid login, TEAM UI restrictions, session survival/revocation, and health; future restarts do not require bootstrap variables.
+- Email extension/auth/identity/analytics foundation: native-auth implementation and handoff are committed on `main`. The canonical ADMIN and TEAM users are initialized with correct roles and sender permissions. Both bootstrap variables were removed and a production restart preserved users, credentials, sender permissions, and database-backed sessions. Sanitized checks passed for invalid login, server-side TEAM `403`, session survival/revocation, and health; future restarts do not require bootstrap variables.
 - Meeting Coach: feature-complete on its branch at the domain/service level with shared-inbox intake boundary at `7bb7d6b`; live Gmail, shared-system integration, and transcript-content confirmation remain.
 - Canonical auth and its Prisma models are decided; Meeting Coach still requires final reconciliation for persistence, analytics, routes, portal navigation, Railway, and any unrelated future Google data integration.

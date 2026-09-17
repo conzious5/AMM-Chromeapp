@@ -147,7 +147,7 @@ Production verification on 2026-09-16:
 - One-time bootstrap completed on 2026-09-16. `admin@authentic-moments.com` is active with `ADMIN`; `cylina@authentic-moments.com` is active with `TEAM`; and Cylina has both her personal and `hello@authentic-moments.com` sender permissions.
 - Sanitized live verification passed: health `200/ok`; invalid login `401`; both canonical logins `200`; ADMIN route as ADMIN `200`; ADMIN route as TEAM `403`; both logouts `204`; and both revoked sessions subsequently returned `401` from `/auth/me`.
 - It is safe to remove `BOOTSTRAP_ADMIN_PASSWORD` and `BOOTSTRAP_TEAM_PASSWORD`. The bootstrap is create-only by normalized unique email, so later restarts do not overwrite initialized users.
-- Post-removal restart verification passed: neither bootstrap variable is present; both active user records, roles, credential timestamps, and sender permissions are unchanged; an existing TEAM session survived restart and was then revoked successfully; invalid login remains `401`; and health remains `200/ok`.
+- Post-removal restart verification passed: neither bootstrap variable is present; both active user records, roles, credential timestamps, and sender permissions are unchanged; an existing TEAM session survived restart; TEAM still receives `403` on the ADMIN route; logout/revocation returns `204` then `401`; invalid login remains `401`; and health remains `200/ok`.
 
 ## Potential merge conflicts
 
