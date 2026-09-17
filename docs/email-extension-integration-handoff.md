@@ -2,7 +2,7 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures) and `6eb8e9e` (accessible multi-compose UI, settings, and harness). This branch is isolated from active canonical auth/Prisma reconciliation and modifies only extension assets, extension tests/fixtures, and extension documentation.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), and `2ebc687` (extension-side adapter for canonical native auth `da95707`). This branch remains isolated and modifies only extension assets, extension tests/fixtures, and extension documentation.
 
 ### What works now
 
@@ -16,7 +16,7 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures) and `6e
 - Explicit loading and recovery messages for auth, sender, draft, network, timeout, rate-limit, model, and API failures.
 - Keyboard focus styles, ARIA labels/live regions, Escape dismissal, readable contrast, reduced-motion support, and responsive sizing.
 - Settings for default action, Zac Review visibility, automatic sender detection, backend environment, and localhost-only mock authentication.
-- `ExtensionAuthProvider`, `ExtensionApiClient`, and extension telemetry interfaces.
+- `ExtensionAuthProvider`, a `NativeExtensionAuthProvider` matching canonical native-auth commit `da95707`, `ExtensionApiClient`, and extension telemetry interfaces.
 - Nineteen rewrite fixtures covering nine AMM Style and ten Zac's Edit scenarios.
 - Dependency-free automated tests and a backend-free two-compose interaction harness.
 
@@ -29,14 +29,14 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures) and `6e
 
 ### What awaits final auth/API integration
 
-- Replace/adapt `BackendExtensionAuthProvider` when canonical native authentication lands.
-- Confirm the final current-user/config and token-refresh contracts.
+- Merge/reconcile the extension-only adapter and UI with canonical native-auth commit `da95707`; the implemented provider already targets its login, rotating refresh, logout, session-storage, and current-config contracts.
+- Verify the current-user/config and token-refresh contracts end to end after merge and deployment.
 - Connect feedback/acceptance telemetry to the canonical service after event semantics are approved.
 - Perform production Gmail tests against the final backend error/status envelope.
 
 ### Verification
 
-- `node --test extension/tests/*.test.cjs`: 11 tests passed.
+- `node --test extension/tests/*.test.cjs`: 12 tests passed.
 - All extension JavaScript passed `node --check`.
 - Manifest and the 19-scenario fixture corpus parse as JSON.
 - `extension/dev-harness.html` provides two independent compose windows for manual interaction verification. The in-app preview could not open a local file URL, so no screenshot was captured in this pass.
@@ -62,7 +62,7 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures) and `6e
 
 ### Remaining dependencies
 
-- Canonical extension auth adapter and native token/session behavior.
+- Merge verification against canonical native auth `da95707`, including refresh rotation, revocation, and session-only token storage.
 - Canonical API feedback/telemetry operations.
 - Real Gmail matrix verification and selector fixtures.
 - Stable production extension ID and distribution configuration.
