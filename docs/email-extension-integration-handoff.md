@@ -1,5 +1,17 @@
 # Email extension and identity-context handoff
 
+## Canonical AMM Style intent-preservation guard — `main`
+
+What was built: the backend now treats AMM Style as draft-preserving polish and Zac's Edit as grounded omission analysis. Rewrite input is labeled as current draft, latest inbound, recent relevant thread, and older history without changing the public route shape. AMM Style output receives deterministic topic/provenance checks; a failed candidate is regenerated once, and a still-unsafe result falls back to the untouched non-empty draft with the review warning. Empty-draft requests are accepted as a distinct latest-inbound reply mode and fail closed if both model attempts drift.
+
+Files: `server/src/prompts/ammStyle.ts`, `server/src/prompts/zacEdit.ts`, `server/src/services/rewriteContext.ts`, `server/src/services/topicDrift.ts`, `server/src/services/rewriteService.ts`, `server/src/services/safetyChecks.ts`, `server/src/schemas/rewrite.ts`, `server/src/types.ts`, `server/src/app.ts`, `server/src/services/modelError.ts`, `server/tests/rewriteService.test.ts`, `server/tests/openAIResponsesModel.test.ts`, and `server/data/eval-tests.jsonl`.
+
+Interfaces and dependencies: `POST /api/rewrite` remains compatible; no new route, environment variable, database change, authentication change, permission change, analytics field, or extension build is required. Privacy-safe production logs may include guardrail categories and regeneration/block status but never draft/thread content.
+
+Tests: typecheck and build pass; Vitest passes 5 files / 26 tests. Regression coverage includes the payment draft versus older apparel/pricing/shipping history, regeneration, fallback, source segmentation, empty draft behavior, mode separation, and privacy-safe topic-drift error classification. Synthetic evaluation fixtures cover excitement, delivery, multiple questions, changed subjects, old pricing, and unrelated history.
+
+UI integration: Agent 3 owns cleaner Gmail context extraction and display of “This suggestion may have added information not present in your draft. Review carefully.” as a secondary safeguard. The backend guard is authoritative and does not rely on the UI detector.
+
 ## Production structured-output hotfix — `main`
 
 What was built: the canonical OpenAI Responses adapter now sends explicit JSON Schema objects for both `rewrite_result` and `training_analysis`, parses `output_text` once, and validates the decoded value with the existing Zod schema. Safe model-error logging retains upstream status/code/type/parameter/request ID without logging request content or secrets.

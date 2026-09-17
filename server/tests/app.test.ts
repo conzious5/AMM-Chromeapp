@@ -42,6 +42,18 @@ describe("API", () => {
     expect(response.statusCode).toBe(200);
     await app.close();
   });
+  it("accepts an empty AMM Style draft for latest-inbound reply generation", async () => {
+    const app = await buildApp({ config: testConfig, auth: new DevelopmentTokenAuth(testConfig.DEV_AUTH_TOKEN), nativeAuth: unusedNativeAuth, rewriteService: new RewriteService(repository, model), analytics: new AnalyticsRepository() });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/rewrite",
+      headers: { authorization: `Bearer ${testConfig.DEV_AUTH_TOKEN}` },
+      payload: { mode: "amm_style", draft: "", subject: "Delivery", thread: "Client: Is my gallery ready?" }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ success: true, rewrittenText: "Warm rewrite" });
+    await app.close();
+  });
   it("enforces the ADMIN role on user administration routes", async () => {
     const nativeAuth = {
       authenticatePortal: async () => ({ id: "team-user", email: "cylina@authentic-moments.com", name: "Cylina", role: "TEAM" })

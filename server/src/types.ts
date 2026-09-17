@@ -31,6 +31,11 @@ export interface RewriteModelResult {
   reviewNotes: string[];
   warnings: string[];
   usage?: ModelUsage;
+  guardrail?: {
+    regenerated: boolean;
+    blocked: boolean;
+    categories: string[];
+  };
 }
 
 export interface LanguageModel {

@@ -5,6 +5,8 @@ const HIGH_RISK_PATTERNS: Array<[string, RegExp]> = [
   ["url", /https?:\/\/\S+/gi]
 ];
 
+export const AMM_SUBSTANTIVE_ADDITION_WARNING = "This suggestion may have added information not present in your draft. Review carefully.";
+
 function matches(text: string, pattern: RegExp): Set<string> {
   return new Set(Array.from(text.matchAll(pattern), (match) => match[0].toLowerCase()));
 }

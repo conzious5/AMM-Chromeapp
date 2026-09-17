@@ -138,4 +138,10 @@ describe("OpenAI structured rewrite output", () => {
     });
     expect(JSON.stringify(fields)).not.toContain("sensitive request details");
   });
+
+  it("classifies an exhausted topic-drift guard without exposing model content", () => {
+    const fields = modelErrorLogFields(Object.assign(new Error("candidate contained private email text"), { code: "TOPIC_DRIFT" }));
+    expect(fields).toEqual({ failure: "model_output_grounding_failed", upstreamCode: "TOPIC_DRIFT" });
+    expect(JSON.stringify(fields)).not.toContain("private email text");
+  });
 });

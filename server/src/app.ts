@@ -78,11 +78,11 @@ export async function buildApp(input: { config: AppConfig; auth: AuthService; na
       }).catch((error) => request.log.warn({ requestId, error }, "analytics event was not persisted"));
       request.log.info({
         requestId, authenticatedUser: principal.email, senderAddress: parsed.data.senderAddress, mode: parsed.data.mode,
-        latencyMs, usage: result.usage, success: true
+        latencyMs, model: input.config.OPENAI_MODEL, usage: result.usage, guardrail: result.guardrail, success: true
       }, "rewrite completed");
       return { success: true, rewrittenText: result.rewrittenText, reviewNotes: result.reviewNotes, warnings: result.warnings, requestId };
     } catch (error) {
-      request.log.error({ requestId, authenticatedUser: principal.email, senderAddress: parsed.data.senderAddress, mode: parsed.data.mode, latencyMs: Math.round(performance.now() - startedAt), success: false, ...modelErrorLogFields(error) }, "rewrite failed");
+      request.log.error({ requestId, authenticatedUser: principal.email, senderAddress: parsed.data.senderAddress, mode: parsed.data.mode, model: input.config.OPENAI_MODEL, latencyMs: Math.round(performance.now() - startedAt), success: false, ...modelErrorLogFields(error) }, "rewrite failed");
       return reply.code(502).send({ success: false, error: "Rewrite failed", requestId });
     }
   });

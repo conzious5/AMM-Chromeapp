@@ -3,7 +3,7 @@ import type { ResponseFormatTextJSONSchemaConfig } from "openai/resources/respon
 
 export const rewriteRequestSchema = z.object({
   mode: z.enum(["amm_style", "zacs_edit"]),
-  draft: z.string().trim().min(1).max(12_000),
+  draft: z.string().trim().max(12_000),
   subject: z.string().trim().max(500).default(""),
   thread: z.string().trim().max(30_000).default(""),
   recipientName: z.string().trim().max(200).optional(),
