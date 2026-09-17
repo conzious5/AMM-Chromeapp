@@ -4,14 +4,13 @@
 
 - Chrome Manifest V3 Gmail extension for developer/unpacked installation.
 - Compose-window AMM Voice action, draft/thread collection, best-effort From/recipient/conversation detection, mode selection, preview, and explicit draft replacement.
-- Google OAuth extension flow through the Railway backend.
-- Signed bearer-token authentication that identifies the human employee.
+- Native AMM Voice email/password login against the existing Railway backend; no Google OAuth or `identity` permission.
+- A 15-minute opaque access token plus rotating, revocable 30-day refresh token. Tokens live in `chrome.storage.session`; the plaintext password is never stored.
 - Backend sender authorization independent of authentication.
 - Rewrite and analytics context fields for sender, recipient, and conversation.
 - Human/sender analytics grouping and portal display.
-- Railway/Google/extension setup documentation.
 
-The extension never sends email and contains no OpenAI API key.
+The extension never sends email and contains no OpenAI API key or permanent backend secret.
 
 ## Branch
 
@@ -19,52 +18,22 @@ The extension never sends email and contains no OpenAI API key.
 
 ## Important commits
 
-- `406c5a6` — Add secure management portal and extension authentication.
+- `406c5a6` — Initial management portal and extension foundation.
 - `d6748a2` — Approve production dependency builds.
+- `da95707` — Replace Google OAuth with native AMM Voice authentication and database permissions.
 
-At handoff time, three small working-tree refinements are not included in `406c5a6`: README extension clarification, compose-dialog selector narrowing, and an additional sender-authorization route test. Inspect `git diff` before integration.
+## Files added or materially changed
 
-## Files added
-
-- `extension/manifest.json`
-- `extension/service-worker.js`
-- `extension/content-script.js`
-- `extension/content-style.css`
-- `extension/options.html`
-- `extension/options.js`
-- `extension/options.css`
-- `docs/extension-setup.md`
-- `server/src/services/portalAuth.ts`
-- `server/src/services/analyticsRepository.ts`
-- `server/prisma/schema.prisma`
-- `server/prisma/migrations/20260917000000_initial_portal/migration.sql`
-- `server/prisma/migrations/20260917010000_identity_sender_split/migration.sql`
-- `server/tests/identityContext.test.ts`
-- Portal application files under `portal/`
-
-## Shared files modified
-
-- `.env.example`
-- `.gitignore`
-- `Dockerfile`
-- `README.md`
-- `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`
-- `server/package.json`
-- `server/src/app.ts`
-- `server/src/config.ts`
-- `server/src/index.ts`
-- `server/src/schemas/rewrite.ts`
-- `server/src/services/auth.ts`
-- `server/tests/app.test.ts`
-- `docs/architecture.md`
-- `docs/security-and-privacy.md`
-- `docs/portal-setup.md`
+- `extension/manifest.json`, service worker, options UI, content script, and styles.
+- `server/src/services/nativeAuth.ts`, `server/src/services/portalAuth.ts`, `server/src/services/auth.ts`.
+- `server/prisma/schema.prisma` and `server/prisma/migrations/20260917020000_native_auth/migration.sql`.
+- `server/src/app.ts`, configuration/startup, auth tests, extension/portal setup docs.
 
 ## Interfaces provided
 
 ### Authentication
 
-`AuthPrincipal` contains stable ID, human email, optional name, and role. `SignedTokenAuth` validates extension tokens; `CompositeAuth` permits signed extension auth plus the local development token adapter.
+`AuthPrincipal` contains stable database user ID, human email, optional name, and role. `NativeAuthService.authenticate` validates an opaque EXTENSION access token against its hashed, non-revoked PostgreSQL session record. Production composition excludes the local development-token adapter.
 
 ### Rewrite context
 
@@ -72,118 +41,79 @@ At handoff time, three small working-tree refinements are not included in `406c5
 
 ### Extension configuration
 
-`GET /api/extension/config` returns:
+`GET /api/extension/config` returns the authenticated human separately from their authorized sender addresses. For Cylina it should return her login identity plus both `cylina@authentic-moments.com` and `hello@authentic-moments.com`.
 
-```json
-{
-  "authenticatedUser": "cylina@authentic-moments.com",
-  "name": "Cylina",
-  "role": "TEAM",
-  "senderAddresses": [
-    "cylina@authentic-moments.com",
-    "hello@authentic-moments.com"
-  ]
-}
-```
+### Token lifecycle
 
-### Analytics overview
+- `POST /auth/extension/login`: email/password exchange for access + refresh tokens.
+- `POST /auth/extension/refresh`: consumes the current refresh token and rotates both tokens.
+- `POST /auth/extension/logout`: revokes the session identified by the bearer token.
 
-`GET /api/portal/overview` accepts optional `authenticatedUser` and `senderAddress` query filters and returns `identityBreakdown` grouped by the pair.
+The service worker retries one 401 after a successful refresh, then clears session tokens if refresh fails.
 
 ## Database requirements
 
 - PostgreSQL and Prisma.
-- Apply both committed migrations in order using `prisma migrate deploy`.
-- `AnalyticsEvent.authenticatedUser`, `senderAddress`, and `recipientAddress` are nullable for backward compatibility. New rewrite events populate the human identity.
+- Apply all committed migrations in order using `prisma migrate deploy`.
+- `UserSenderPermission` is authoritative in production. `USER_SENDER_PERMISSIONS_JSON` is development fallback only.
+- `hello@authentic-moments.com` is only a sender permission and must never be inserted as a login user.
 
 ## Authentication requirements
 
-- Every employee signs in using an individual approved company Google account.
-- `hello@authentic-moments.com` is a shared sender, not a login identity.
-- Production extension OAuth requires the exact Chrome extension ID in `EXTENSION_IDS`.
-- Sender use is denied unless listed for the authenticated employee in `USER_SENDER_PERMISSIONS_JSON`.
+- Every employee signs in with an individual AMM Voice email/password account.
+- Canonical ADMIN: `admin@authentic-moments.com`.
+- Canonical TEAM user: `cylina@authentic-moments.com`.
+- Google Cloud is not used for authentication.
+- Sender use is denied unless stored for the authenticated user in PostgreSQL.
+- Changing Gmail’s From address cannot change the access-token principal.
 
 ## Analytics requirements
 
 - Preserve human and sender as independent dimensions.
-- Do not log or persist full draft/thread bodies.
+- Do not log or persist full draft/thread bodies or credentials.
 - Retain the opaque conversation reference only when available.
 - Reports may aggregate by human, sender, or human+sender.
 
 ## Environment variables
 
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `SESSION_SECRET`
-- `PUBLIC_BASE_URL`
-- `ADMIN_EMAILS`
-- `TEAM_EMAILS`
-- `EXTENSION_IDS`
-- `USER_SENDER_PERMISSIONS_JSON`
-- `DATABASE_URL`
-- `ALLOWED_ORIGINS`
-
-## Routes
-
-- `GET /auth/extension/start`
-- `GET /auth/extension/callback`
-- `GET /api/extension/config`
-- `POST /api/rewrite`
-- `GET /api/portal/overview`
-
-Portal session routes are documented in `docs/portal-setup.md`.
+- `PUBLIC_BASE_URL`, `DATABASE_URL`, `ALLOWED_ORIGINS`.
+- `BOOTSTRAP_ADMIN_PASSWORD` and `BOOTSTRAP_TEAM_PASSWORD` only during one-time account creation.
+- `DEV_AUTH_TOKEN` and `USER_SENDER_PERMISSIONS_JSON` only for local development behavior.
+- Google client secrets, OAuth callbacks, `SESSION_SECRET`, email allowlists, and `EXTENSION_IDS` are obsolete and removed.
 
 ## UI integration requirements
 
 - Load `extension/` as an unpacked extension for MVP testing.
+- Configure its exact `chrome-extension://...` origin in `ALLOWED_ORIGINS`.
 - The compose button must remain preview/replace only; never invoke Gmail Send.
 - Gmail DOM selectors are best effort. If From detection fails, the UI requests a choice from backend-authorized sender addresses.
-- Changing the Gmail From selection must trigger fresh context detection and must not trigger reauthentication.
+- Changing Gmail From selection must trigger fresh context detection and must not trigger reauthentication.
 
 ## Known limitations
 
 - Gmail DOM selectors are undocumented and may need maintenance.
 - Current preview and mode/sender selection use native confirm/prompt dialogs; a production panel should replace them.
-- The extension ID is not stable across unpacked installs unless Chrome preserves the installation or a manifest key/distribution package is used.
-- Tokens are stored in `chrome.storage.local`; production hardening may move them to session storage/refresh flow.
-- Sender permissions are currently environment-configured rather than database-administered.
 - Only one recipient address is recorded even when Gmail contains multiple recipients.
-
-## Assumptions
-
-- Google OAuth web credentials can register the backend extension callback.
-- The signed-token lifetime of eight hours is acceptable for the MVP.
-- Backend configuration remains authoritative for employee and sender permission assignment.
+- TOTP is deferred to the next authentication-hardening step.
 
 ## Tests
 
-- Server TypeScript typecheck passes.
-- Server Vitest suite passes: 10 tests at last run.
+- Server typecheck, build, and 14-test Vitest suite pass.
 - Portal production build passes.
 - Extension JavaScript syntax checks pass.
-- `manifest.json` parses and declares Manifest V3.
+- Manifest V3 no longer requests Chrome’s `identity` permission.
 
 ## Potential merge conflicts
 
-- `server/src/app.ts`
-- `server/src/config.ts`
-- `server/src/index.ts`
-- `server/src/services/auth.ts`
-- `server/src/services/analyticsRepository.ts`
-- `server/prisma/schema.prisma` and migration ordering
-- `portal/src/main.tsx`
-- package manifests and lockfile
-- Railway/Google setup documentation
-
-Meeting Coach intentionally avoided these shared files; integration must use its ports rather than replacing current implementations.
+- Shared auth/config/startup files, Prisma schema/migration ordering, `portal/src/main.tsx`, package lockfile, and Railway setup docs.
+- Meeting Coach intentionally avoided these files; integration must use its ports and the canonical database user ID.
 
 ## Remaining work
 
-1. Configure production Google redirect URIs and Railway variables.
-2. Stabilize the unpacked extension ID and add it to `EXTENSION_IDS`.
-3. Apply migrations to the target database.
-4. Perform a real Gmail end-to-end test with Cylina using both permitted From addresses.
+1. Push/redeploy and apply the native-auth migration.
+2. Bootstrap the two canonical users once, then remove bootstrap variables.
+3. Configure the installed extension origin in `ALLOWED_ORIGINS`.
+4. Perform a real Gmail end-to-end test with Cylina using both permitted From addresses, refresh rotation, and logout/revocation.
 5. Replace native dialogs with the approved extension UI.
 6. Add acceptance/regeneration telemetry after UX is finalized.
-7. Decide whether sender permissions move into a canonical user/permission database model.
-8. Reconcile shared systems with Meeting Coach during final integration.
+7. Reconcile shared systems with Meeting Coach during final integration.

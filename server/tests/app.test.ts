@@ -51,4 +51,26 @@ describe("API", () => {
     expect(response.statusCode).toBe(403);
     await app.close();
   });
+  it("sets an HttpOnly SameSite portal cookie after native login", async () => {
+    const nativeAuth = {
+      login: async () => ({
+        user: { id: "admin-user", email: "admin@authentic-moments.com", name: "AMM Administrator", role: "ADMIN", active: true },
+        accessToken: "opaque-access-token", accessExpiresAt: new Date(Date.now() + 60_000).toISOString()
+      })
+    } as unknown as NativeAuthService;
+    const app = await buildApp({ config: testConfig, auth: new DevelopmentTokenAuth(testConfig.DEV_AUTH_TOKEN), nativeAuth, rewriteService: new RewriteService(repository, model), analytics: new AnalyticsRepository() });
+    const response = await app.inject({ method: "POST", url: "/auth/login", payload: { email: "admin@authentic-moments.com", password: "private-password" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toContain("amm_voice_session=opaque-access-token");
+    expect(response.headers["set-cookie"]).toContain("HttpOnly");
+    expect(response.headers["set-cookie"]).toContain("SameSite=Strict");
+    await app.close();
+  });
+  it("rejects production browser login without the configured Origin", async () => {
+    const config = { ...testConfig, NODE_ENV: "production" as const, PUBLIC_BASE_URL: "https://voice.example.com" };
+    const app = await buildApp({ config, auth: new DevelopmentTokenAuth(config.DEV_AUTH_TOKEN), nativeAuth: unusedNativeAuth, rewriteService: new RewriteService(repository, model), analytics: new AnalyticsRepository() });
+    const response = await app.inject({ method: "POST", url: "/auth/login", payload: { email: "admin@authentic-moments.com", password: "private-password" } });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
 });
