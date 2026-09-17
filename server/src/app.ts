@@ -12,6 +12,7 @@ import type { RewriteService } from "./services/rewriteService.js";
 import type { AnalyticsRepository } from "./services/analyticsRepository.js";
 import { registerPortalAuth, requirePortalUser } from "./services/portalAuth.js";
 import type { NativeAuthService } from "./services/nativeAuth.js";
+import { modelErrorLogFields } from "./services/modelError.js";
 
 export async function buildApp(input: { config: AppConfig; auth: AuthService; nativeAuth: NativeAuthService; rewriteService: RewriteService; analytics: AnalyticsRepository }) {
   const app = Fastify({
@@ -81,7 +82,7 @@ export async function buildApp(input: { config: AppConfig; auth: AuthService; na
       }, "rewrite completed");
       return { success: true, rewrittenText: result.rewrittenText, reviewNotes: result.reviewNotes, warnings: result.warnings, requestId };
     } catch (error) {
-      request.log.error({ requestId, authenticatedUser: principal.email, senderAddress: parsed.data.senderAddress, mode: parsed.data.mode, latencyMs: Math.round(performance.now() - startedAt), success: false, error }, "rewrite failed");
+      request.log.error({ requestId, authenticatedUser: principal.email, senderAddress: parsed.data.senderAddress, mode: parsed.data.mode, latencyMs: Math.round(performance.now() - startedAt), success: false, ...modelErrorLogFields(error) }, "rewrite failed");
       return reply.code(502).send({ success: false, error: "Rewrite failed", requestId });
     }
   });

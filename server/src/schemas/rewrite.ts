@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ResponseFormatTextJSONSchemaConfig } from "openai/resources/responses/responses";
 
 export const rewriteRequestSchema = z.object({
   mode: z.enum(["amm_style", "zacs_edit"]),
@@ -18,6 +19,24 @@ export const rewriteModelResultSchema = z.object({
   reviewNotes: z.array(z.string()).max(6),
   warnings: z.array(z.string()).max(6)
 }).strict();
+
+export const rewriteResultJsonSchema = {
+  type: "object",
+  properties: {
+    rewrittenText: { type: "string", minLength: 1 },
+    reviewNotes: { type: "array", items: { type: "string" }, maxItems: 6 },
+    warnings: { type: "array", items: { type: "string" }, maxItems: 6 }
+  },
+  required: ["rewrittenText", "reviewNotes", "warnings"],
+  additionalProperties: false
+} as const satisfies ResponseFormatTextJSONSchemaConfig["schema"];
+
+export const rewriteResultTextFormat = {
+  type: "json_schema",
+  name: "rewrite_result",
+  strict: true,
+  schema: rewriteResultJsonSchema
+} as const satisfies ResponseFormatTextJSONSchemaConfig;
 
 export const rewriteResponseSchema = rewriteModelResultSchema.extend({
   success: z.literal(true),
