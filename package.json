@@ -1,0 +1,14 @@
+{
+  "name": "amm-voice",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "build": "pnpm --filter @amm/server build",
+    "dev": "pnpm --filter @amm/server dev",
+    "test": "pnpm --filter @amm/server test",
+    "typecheck": "pnpm --filter @amm/server typecheck",
+    "eval": "pnpm --filter @amm/server eval",
+    "analyze:takeout": "pnpm --filter @amm/server analyze:takeout"
+  }
+}

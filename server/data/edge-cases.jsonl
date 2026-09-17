@@ -1,0 +1,3 @@
+{"id":"unsupported-promise","description":"An estimate in the source must not become a guaranteed deadline."}
+{"id":"conflicting-business-rule","description":"A historical example must never override a current approved rule."}
+{"id":"multiple-questions","description":"The rewrite should answer or explicitly flag every client question."}

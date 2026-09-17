@@ -1,0 +1,30 @@
+# Architecture
+
+## Phase 1: communication intelligence
+
+The server owns all intelligence and sensitive processing:
+
+1. Validate and minimize the request.
+2. Retrieve current business rules and a few approved examples through `StyleRepository`.
+3. Generate a structured rewrite through the OpenAI Responses API with storage disabled.
+4. Run deterministic post-generation checks for invented high-risk facts, unsupported commitments, excessive apology, defensive/cold wording, missing next steps, and excessive length.
+5. Return the rewrite, concise review notes, warnings, and an opaque request ID.
+
+Corpus processing is intentionally separate. A Takeout MBOX file is parsed locally, sent messages are paired with the nearest prior external message in the same thread, obvious low-value messages are filtered, PII is anonymized, and useful pairs can be analyzed into structured JSON. Nothing enters the approved library automatically.
+
+## Boundaries
+
+- `StyleRepository` hides the storage/retrieval implementation. The MVP uses local files; vector search or PostgreSQL can replace it.
+- `LanguageModel` hides OpenAI, which also makes the rewrite and evaluation logic testable without network calls.
+- Style profiles never contain current prices, turnaround times, staffing, or policies.
+- `current-business-rules.json` is the only approved mutable business-fact source in the MVP.
+- The future extension only gathers minimal visible context and presents a preview. It never sends mail automatically.
+
+## Prompt priority
+
+1. Current email thread
+2. Current approved business rules
+3. Draft intent
+4. AMM communication principles
+5. Approved, anonymized examples
+6. General model knowledge

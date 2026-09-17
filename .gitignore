@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+dist/
+.env
+.DS_Store
+coverage/
+server/data/private/
+server/data/analysis-output/
+*.mbox
+*.mbx
+Takeout/

@@ -1,0 +1,5 @@
+{
+  "status": "awaiting-corpus-analysis",
+  "evidenceThreshold": "Record a pattern only after it appears in multiple independent strong examples.",
+  "dimensions": {}
+}

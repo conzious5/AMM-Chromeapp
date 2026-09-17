@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "principles": [
+    "Understand the explicit request and any reasonably supported concern.",
+    "Acknowledge the concern and thank the client when natural.",
+    "Explain facts clearly and take ownership when AMM is responsible.",
+    "Avoid blame and manufactured excuses.",
+    "Provide the solution or next step.",
+    "Prevent likely confusion without inventing concerns.",
+    "End constructively and avoid accidental promises."
+  ],
+  "avoidPhrases": ["Please be advised", "Per my previous email", "At your earliest convenience", "We value your business", "We apologize for any inconvenience", "As per", "Touching base regarding"]
+}
