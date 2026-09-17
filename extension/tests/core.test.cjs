@@ -10,6 +10,13 @@ test("sender detection never guesses outside backend-authorized identities", () 
   assert.equal(core.resolveSender("", ["hello@authentic-moments.com"]).sender, "");
 });
 
+test("inline Gmail compose falls back to the authenticated sender only when From metadata is absent", () => {
+  const allowed = ["admin@authentic-moments.com", "hello@authentic-moments.com"];
+  assert.deepEqual(core.resolveComposeSender("", "admin@authentic-moments.com", allowed), { sender: "admin@authentic-moments.com", options: allowed, needsSelection: false, detected: true });
+  assert.deepEqual(core.resolveComposeSender("hello@authentic-moments.com", "admin@authentic-moments.com", allowed), { sender: "hello@authentic-moments.com", options: allowed, needsSelection: false, detected: true });
+  assert.equal(core.resolveComposeSender("outsider@example.com", "admin@authentic-moments.com", allowed).needsSelection, true);
+});
+
 test("compose sessions remain isolated", () => {
   const a = core.createComposeSession("a"); const b = core.createComposeSession("b"); a.mode = "amm_style"; a.selectedSender = "hello@authentic-moments.com"; b.mode = "zacs_edit"; b.selectedSender = "cylina@authentic-moments.com"; a.output = { rewrittenText: "A" };
   assert.deepEqual({ mode: a.mode, sender: a.selectedSender, text: a.output.rewrittenText }, { mode: "amm_style", sender: "hello@authentic-moments.com", text: "A" });

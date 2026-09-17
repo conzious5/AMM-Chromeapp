@@ -135,6 +135,58 @@ test("real-Gmail body and panel anchors avoid the AI prompt and hidden toolbars"
   assert.equal(compose.findBody(composeRoot), body); assert.deepEqual(compose.composeMount(composeRoot), { parent: sendTable.parentElement, before: sendTable });
 });
 
+function gmailComposeFixture({ role, label, subject, recipientCount = 1, responseMarker = "" }) {
+  const sendTable = { parentElement: { id: `${role}-${subject}-toolbar` } }; const send = { closest(name) { return name === "table" ? sendTable : null; } };
+  const recipients = Array.from({ length: recipientCount }, (_, index) => ({ getAttribute(name) { return name === "email" ? `client${index}@example.com` : null; }, closest() { return null; } }));
+  const root = {
+    getAttribute(name) { return name === "role" ? role : name === "aria-label" ? label : name === "data-amm-compose-id" ? `${role}-${subject}` : null; },
+    setAttribute() {}, contains() { return true; },
+    querySelector(selector) { if (selector.includes('aria-label="Send"')) return send; if (selector === 'input[name="subjectbox"]') return { value: subject }; if (responseMarker && selector.endsWith(`.${responseMarker}`)) return { className: responseMarker }; return null; },
+    querySelectorAll(selector) { if (selector === compose.BODY_SELECTOR) return [body]; if (selector.includes("[email]")) return recipients; return []; }
+  };
+  const body = {
+    nodeType: 1, parentElement: root,
+    matches(selector) { return selector === compose.BODY_SELECTOR; },
+    getAttribute(name) { return name === "g_editable" ? "true" : name === "aria-label" ? "Message Body" : null; },
+    closest(selector) { if (selector.includes(`[role="${role}"]`) || selector === compose.COMPOSE_BOUNDARY_SELECTOR) return root; return null; },
+    cloneNode() { return { innerText: "Current draft", querySelectorAll() { return []; } }; }, contains() { return false; }
+  };
+  return { root, body, sendTable };
+}
+
+test("generalized Gmail adapter discovers new compose, reply, reply all, and forward boundaries", () => {
+  const fixtures = [
+    { expected: compose.COMPOSE_MODES.NEW_COMPOSE, fixture: gmailComposeFixture({ role: "dialog", label: "New Message", subject: "Consultation" }) },
+    { expected: compose.COMPOSE_MODES.REPLY, fixture: gmailComposeFixture({ role: "region", label: "Re: Consultation", subject: "Re: Consultation" }) },
+    { expected: compose.COMPOSE_MODES.REPLY_ALL, fixture: gmailComposeFixture({ role: "region", label: "Re: Consultation", subject: "Re: Consultation", recipientCount: 2, responseMarker: "mK" }) },
+    { expected: compose.COMPOSE_MODES.FORWARD, fixture: gmailComposeFixture({ role: "region", label: "Fwd: Consultation", subject: "Fwd: Consultation", responseMarker: "mI" }) }
+  ];
+  const scope = { querySelectorAll(selector) { return selector === compose.BODY_SELECTOR ? fixtures.map(({ fixture }) => fixture.body) : []; } };
+  assert.deepEqual(compose.findComposeRoots(scope), fixtures.map(({ fixture }) => fixture.root));
+  fixtures.forEach(({ fixture, expected }) => { assert.equal(compose.composeRootForBody(fixture.body), fixture.root); assert.equal(compose.composeMode(fixture.root, fixture.root.querySelector('input[name="subjectbox"]').value), expected); assert.equal(compose.composeAdapter(fixture.root, { querySelectorAll() { return []; }, location: { hash: "" } }).mode, expected); });
+});
+
+test("all compose modes expose one safe adapter contract without recipient mutation operations", () => {
+  for (const item of [
+    gmailComposeFixture({ role: "dialog", label: "New Message", subject: "New" }),
+    gmailComposeFixture({ role: "region", label: "Re: One", subject: "Re: One" }),
+    gmailComposeFixture({ role: "region", label: "Re: All", subject: "Re: All", recipientCount: 3, responseMarker: "mK" }),
+    gmailComposeFixture({ role: "region", label: "Fwd: One", subject: "Fwd: One" })
+  ]) {
+    const adapter = compose.composeAdapter(item.root, { querySelectorAll() { return []; }, location: { hash: "" } });
+    for (const operation of ["getBody", "getSubject", "getSender", "getRecipients", "getThreadContext", "getToolbarAnchor", "replaceDraft", "restoreDraft"]) assert.equal(typeof adapter[operation], "function");
+    assert.equal("setRecipients" in adapter, false); assert.equal("send" in adapter, false); assert.equal(adapter.getBody(), item.body); assert.equal(adapter.getToolbarAnchor().before, item.sendTable);
+  }
+});
+
+test("signature and quoted/forwarded history remain protected for every compose mode", () => {
+  assert.match(compose.PROTECTED_SELECTOR, /gmail_signature/); assert.match(compose.PROTECTED_SELECTOR, /gmail_quote/);
+  for (const subject of ["New", "Re: Reply", "Re: Reply all", "Fwd: Forward"]) {
+    const clone = { innerText: "Authored text\nSignature\nHistory", querySelectorAll(selector) { assert.equal(selector, compose.PROTECTED_SELECTOR); return [{ remove() { clone.innerText = "Authored text"; } }]; } };
+    assert.equal(compose.draftText({ cloneNode() { return clone; } }), "Authored text", subject);
+  }
+});
+
 test("outbound compose context reads current recipients and recognizes only Gmail Send", () => {
   function node(attributes = {}, value = "") { return { value, getAttribute(name) { return attributes[name] || null; }, closest(selector) { if (selector === ".amm-voice-shell") return null; if (selector.includes("from") && /from/i.test(attributes["aria-label"] || "")) return this; return null; } }; }
   const recipient = node({ email: "client@example.com" }); const cc = node({}, "producer@example.com"); const sender = node({ email: "hello@authentic-moments.com", "aria-label": "From: hello@authentic-moments.com" }); const quoted = node({ email: "old@example.com" }); const body = { getAttribute(name) { return name === "g_editable" ? "true" : null; }, cloneNode() { return { innerText: "Final body", querySelectorAll() { return []; } }; }, contains(candidate) { return candidate === quoted; } };

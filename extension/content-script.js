@@ -74,7 +74,7 @@
     if (!state.assistance.originalDraft) state.assistance.originalDraft = state.context.draft; if (state.mode === "zacs_edit") state.assistance.zacsEditUsed = true; else state.assistance.ammStyleUsed = true;
     try {
       setBusy(state, true, state.mode === "zacs_edit" ? "Analyzing the conversation…" : "Polishing your draft…"); const config = await configFor(state); state.config = config;
-      const senderState = Core.resolveSender(state.context.senderAddress, config.senderAddresses || [], state.settings.autoDetectSender); renderSender(state, senderState);
+      const senderState = Core.resolveComposeSender(state.context.senderAddress, config.authenticatedUser, config.senderAddresses || [], state.settings.autoDetectSender); renderSender(state, senderState);
       if (senderState.needsSelection) { setBusy(state, false, senderState.options.length ? "Confirm the From address before continuing." : "No authorized sender identities are available."); state.ui.continueButton.hidden = senderState.options.length === 0; state.ui.continueButton.textContent = "Continue"; return; }
       const payload = { mode: state.mode, draft: state.context.draft, subject: state.context.subject, thread: state.context.thread, senderAddress: state.selectedSender };
       if (state.context.recipientAddress) payload.recipientAddress = state.context.recipientAddress; if (state.context.conversationId) payload.conversationId = state.context.conversationId; state.payload = payload;
@@ -91,7 +91,7 @@
   function closePanel(state) { if (state.busy) return; state.ui.panel.hidden = true; state.ui.result.hidden = true; state.ui.status.textContent = ""; }
   function observeIntentionalSend(state, event) {
     if (event.isTrusted === false || !Gmail.isSendControl(event.target, state.compose)) return;
-    let context; try { context = Gmail.outboundContext(state.compose); } catch { return; }
+    let context; try { context = Gmail.outboundContext(state.compose); if (!context.senderAddress) context.senderAddress = state.coachingConfig?.authenticatedUser || ""; } catch { return; }
     Coaching.observeOutboundSend({ context, state, config: state.coachingConfig, submit: submitOutboundCoaching, emit });
   }
   function bindSendObserver(state, compose) {
@@ -103,7 +103,7 @@
     state.context = null; state.output = null; state.payload = null; state.undoSnapshot = null; state.coachingConfig = null; state.coachingSendDedup = null; state.assistance.originalDraft = ""; state.assistance.lastSuggestion = ""; state.assistance.acceptedText = "";
   }
   function wireState(compose, ui) {
-    const state = { ...Core.createComposeSession(compose.getAttribute("data-thread-perm-id") || ""), compose, ui, settings: Core.SETTINGS_DEFAULTS };
+    const state = { ...Core.createComposeSession(Gmail.composeIdentity(compose)), compose, ui, settings: Core.SETTINGS_DEFAULTS };
     ui.ammButton.addEventListener("click", () => { state.mode = "amm_style"; emit("extension_opened", { mode: state.mode }); runRewrite(state); }); ui.zacButton.addEventListener("click", () => { state.mode = "zacs_edit"; emit("extension_opened", { mode: state.mode }); runRewrite(state); });
     ui.close.addEventListener("click", () => closePanel(state)); ui.cancel.addEventListener("click", () => closePanel(state)); ui.sender.addEventListener("change", () => { state.selectedSender = ui.sender.value; }); ui.continueButton.addEventListener("click", () => { if (state.errorCode === "AUTH_REQUIRED") { call("OPEN_SETTINGS").catch(() => {}); return; } state.ui.senderRow.hidden ? runRewrite(state) : continueWithSender(state); });
     ui.retry.addEventListener("click", () => runRewrite(state, true)); ui.replace.addEventListener("click", () => { if (!state.output?.rewrittenText) return; state.undoSnapshot = Gmail.replaceDraftBody(Gmail.findBody(state.compose), state.output.rewrittenText); state.assistance.rewriteAccepted = true; state.assistance.acceptedText = state.output.rewrittenText; ui.undo.disabled = false; ui.status.textContent = "Draft replaced. Review it in Gmail before sending."; emit("rewrite_accepted", { mode: state.mode }); });
@@ -113,7 +113,7 @@
   }
 
   const lifecycle = Lifecycle.createComposeLifecycle({
-    identityFor: Gmail.composeIdentity,
+    identityFor: Gmail.ensureComposeIdentity,
     createState: (compose) => wireState(compose, createPanel()),
     controlsAttached: (compose, state) => { const shells = compose.querySelectorAll(".amm-voice-shell"); return shells.length === 1 && shells[0] === state.ui.shell && state.ui.shell.isConnected && compose.contains(state.ui.shell); },
     attachControls,
@@ -123,10 +123,9 @@
 
   function composeCandidates(root, candidates) {
     if (root?.nodeType !== Node.ELEMENT_NODE) return;
-    if (root.matches?.('[role="dialog"]')) candidates.add(root);
-    root.querySelectorAll?.('[role="dialog"]').forEach((compose) => candidates.add(compose));
+    Gmail.findComposeRoots(root).forEach((compose) => candidates.add(compose));
   }
-  function composeContaining(node) { return node?.nodeType === Node.ELEMENT_NODE ? node.closest?.('[role="dialog"]') : node?.parentElement?.closest?.('[role="dialog"]'); }
+  function composeContaining(node) { return Gmail.composeRootForNode(node); }
   function mutationTouchesComposeChrome(record, compose) {
     const body = Gmail.findBody(compose); if (body && (record.target === body || body.contains(record.target))) return false;
     return [...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE);
@@ -142,11 +141,11 @@
       record.addedNodes.forEach((node) => composeCandidates(node, pendingComposes));
       const compose = composeContaining(record.target);
       if (compose && mutationTouchesComposeChrome(record, compose)) { pendingComposes.add(compose); relevant = true; }
-      if ([...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE && (node.matches?.(".amm-voice-shell, [role=dialog]") || node.querySelector?.(".amm-voice-shell, [role=dialog]")))) relevant = true;
+      if ([...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === Node.ELEMENT_NODE && (node.matches?.(`.amm-voice-shell, ${Gmail.BODY_SELECTOR}`) || node.querySelector?.(`.amm-voice-shell, ${Gmail.BODY_SELECTOR}`)))) relevant = true;
     });
     if (relevant || pendingComposes.size) queueReconcile();
   }
   const observer = new MutationObserver(observe);
   observer.observe(document.documentElement, { childList: true, subtree: true });
-  lifecycle.reconcile([...document.querySelectorAll('[role="dialog"]')].filter((compose) => Gmail.findBody(compose)));
+  lifecycle.reconcile(Gmail.findComposeRoots(document));
 })();

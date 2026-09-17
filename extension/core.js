@@ -19,6 +19,7 @@
     if (autoDetect && normalizedDetected && normalizedAllowed.includes(normalizedDetected)) return { sender: normalizedDetected, options: normalizedAllowed, needsSelection: false, detected: true };
     return { sender: "", options: normalizedAllowed, needsSelection: true, detected: false };
   }
+  function resolveComposeSender(detected, authenticatedUser, allowed, autoDetect = true) { return resolveSender(normalizeEmail(detected) || normalizeEmail(authenticatedUser), allowed, autoDetect); }
   function extractQuestions(text, limit = 8) {
     const normalized = String(text || "").replace(/\s+/g, " ").trim(); if (!normalized) return [];
     const matches = normalized.match(/(?:^|(?<=[.!?]\s))[^?]{3,260}\?/g) || [];
@@ -63,5 +64,5 @@
   }
   function meaningfulReviewNotes(notes) { return (notes || []).map((value) => String(value || "").trim()).filter((value) => value && !/\b(grammar|spelling|punctuation|comma|capitalization|typo)\b/i.test(value)); }
   function createComposeSession(id = "") { return { id, mode: "amm_style", busy: false, selectedSender: "", output: null, payload: null, undoSnapshot: null, coachingConfig: null, coachingSendDedup: null, assistance: { ammStyleUsed: false, zacsEditUsed: false, rewriteAccepted: false, originalDraft: "", lastSuggestion: "", acceptedText: "", warningCodes: [], questionCoverageWarningDisplayed: false } }; }
-  return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, extractQuestions, questionCoverage, limitThread, warningView, classifyError, sanitizeTelemetry, meaningfulReviewNotes, createComposeSession };
+  return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, resolveComposeSender, extractQuestions, questionCoverage, limitThread, warningView, classifyError, sanitizeTelemetry, meaningfulReviewNotes, createComposeSession };
 });

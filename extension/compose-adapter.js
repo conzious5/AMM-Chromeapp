@@ -5,10 +5,36 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function (core) {
   "use strict";
   const BODY_SELECTOR = '[contenteditable="true"][role="textbox"]'; const PROTECTED_SELECTOR = ".gmail_signature, .gmail_quote, [data-smartmail=\"gmail_signature\"]";
+  const COMPOSE_BOUNDARY_SELECTOR = '[role="dialog"], [role="region"]';
+  const COMPOSE_MODES = Object.freeze({ NEW_COMPOSE: "new_compose", REPLY: "reply", REPLY_ALL: "reply_all", FORWARD: "forward" });
   function textOf(element) { return element?.innerText?.trim() || element?.textContent?.trim() || ""; }
   function findBody(compose) {
     const candidates = [...(compose?.querySelectorAll?.(BODY_SELECTOR) || [])];
     return candidates.find((node) => node.getAttribute?.("g_editable") === "true") || candidates.find((node) => !/describe your message/i.test(node.getAttribute?.("aria-label") || "")) || null;
+  }
+  function isComposeBody(node) { return Boolean(node?.matches?.(BODY_SELECTOR) && (node.getAttribute?.("g_editable") === "true" || /message body/i.test(node.getAttribute?.("aria-label") || ""))); }
+  function hasSendControl(compose) { return Boolean(compose?.querySelector?.('[role="button"][aria-label="Send"], [role="button"][data-tooltip="Send"]')); }
+  function composeRootForBody(body) {
+    if (!isComposeBody(body)) return null;
+    const dialog = body.closest?.('[role="dialog"]'); if (dialog && hasSendControl(dialog)) return dialog;
+    const region = body.closest?.('[role="region"]'); if (region && hasSendControl(region)) return region;
+    return null;
+  }
+  function composeRootForNode(node) {
+    const element = node?.nodeType === 1 ? node : node?.parentElement; if (!element) return null;
+    if (isComposeBody(element)) return composeRootForBody(element);
+    let boundary = element.closest?.(COMPOSE_BOUNDARY_SELECTOR);
+    while (boundary) {
+      if (findBody(boundary) && hasSendControl(boundary)) return boundary;
+      boundary = boundary.parentElement?.closest?.(COMPOSE_BOUNDARY_SELECTOR);
+    }
+    return null;
+  }
+  function findComposeRoots(scope) {
+    const roots = new Set();
+    if (isComposeBody(scope)) { const own = composeRootForBody(scope); if (own) roots.add(own); }
+    for (const body of scope?.querySelectorAll?.(BODY_SELECTOR) || []) { const compose = composeRootForBody(body); if (compose) roots.add(compose); }
+    return [...roots];
   }
   function composeMount(compose) {
     const sendButton = compose?.querySelector?.('[role="button"][aria-label="Send"], [role="button"][data-tooltip^="Send"]'); const sendTable = sendButton?.closest?.("table");
@@ -16,7 +42,11 @@
     const toolbars = [...(compose?.querySelectorAll?.('[role="toolbar"]') || [])]; const toolbar = toolbars.find((node) => node.parentElement && (node.parentElement.offsetWidth || node.parentElement.offsetHeight)) || toolbars[0];
     return { parent: toolbar?.parentElement || compose, before: null };
   }
-  function composeIdentity(compose) { return compose?.getAttribute?.("data-thread-perm-id") || compose?.getAttribute?.("aria-labelledby") || ""; }
+  function composeIdentity(compose) { return compose?.getAttribute?.("data-thread-perm-id") || compose?.getAttribute?.("aria-labelledby") || compose?.getAttribute?.("data-amm-compose-id") || ""; }
+  function ensureComposeIdentity(compose) {
+    const existing = composeIdentity(compose); if (existing) return existing;
+    const generated = `amm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; compose?.setAttribute?.("data-amm-compose-id", generated); return generated;
+  }
   function draftText(body) { if (!body) return ""; const copy = body.cloneNode(true); copy.querySelectorAll?.(PROTECTED_SELECTOR).forEach((node) => node.remove()); return textOf(copy); }
   function detectSender(compose) {
     const selectors = ['input[name="from"]', '[name="from"] [email]', '[data-tooltip^="From:"]', '[aria-label^="From:"]', '[aria-label^="From "]'];
@@ -37,8 +67,18 @@
     const hash = documentRef?.location?.hash || (typeof location !== "undefined" ? location.hash : ""); const conversationId = hash.match(/[a-f0-9]{16,}/i)?.[0] || compose.getAttribute("data-thread-perm-id") || "";
     return { body, subject, draft: draftText(body), recipientAddress: recipientAddress(compose), senderAddress: detectSender(compose), thread: core.limitThread(threadMessages(documentRef, body), { maxMessages: 6, maxChars: 20000 }), conversationId };
   }
-  function composeMode(compose, subject = "") { const label = [compose?.getAttribute?.("aria-label"), compose?.querySelector?.("h2")?.textContent, subject].filter(Boolean).join(" "); if (/reply all/i.test(label)) return "reply_all"; if (/forward|\bfwd:/i.test(label)) return "forward"; if (/reply|\bre:/i.test(label)) return "reply"; return "new_compose"; }
-  function outboundContext(compose, documentRef = document) { const context = composeContext(compose, documentRef); return { composeId: composeIdentity(compose), composeMode: composeMode(compose, context.subject), senderAddress: context.senderAddress, recipientAddresses: recipientAddresses(compose), subject: context.subject, finalBody: context.draft, threadContext: context.thread, conversationRef: context.conversationId }; }
+  function composeMode(compose, subject = "") {
+    const label = [compose?.getAttribute?.("aria-label"), compose?.querySelector?.("h2")?.textContent, subject].filter(Boolean).join(" ");
+    if (/forward|\bfwd:/i.test(label) || compose?.querySelector?.('[aria-label="Type of response"] .mI')) return COMPOSE_MODES.FORWARD;
+    if (/reply all/i.test(label) || compose?.querySelector?.('[aria-label="Type of response"] .mK')) return COMPOSE_MODES.REPLY_ALL;
+    if (compose?.getAttribute?.("role") === "region" || /reply|\bre:/i.test(label) || compose?.querySelector?.('[aria-label="Type of response"] .mL')) return COMPOSE_MODES.REPLY;
+    return COMPOSE_MODES.NEW_COMPOSE;
+  }
+  function composeAdapter(compose, documentRef = document) {
+    const context = composeContext(compose, documentRef); const recipients = recipientAddresses(compose);
+    return { root: compose, mode: composeMode(compose, context.subject), getBody: () => findBody(compose), getSubject: () => composeContext(compose, documentRef).subject, getSender: () => detectSender(compose), getRecipients: () => recipientAddresses(compose), getThreadContext: () => composeContext(compose, documentRef).thread, getToolbarAnchor: () => composeMount(compose), replaceDraft: (replacement) => replaceDraftBody(findBody(compose), replacement), restoreDraft: (snapshot) => restoreDraftBody(findBody(compose), snapshot), context, recipients };
+  }
+  function outboundContext(compose, documentRef = document) { const adapter = composeAdapter(compose, documentRef); const context = adapter.context; return { composeId: composeIdentity(compose), composeMode: adapter.mode, senderAddress: context.senderAddress, recipientAddresses: adapter.recipients, subject: context.subject, finalBody: context.draft, threadContext: context.thread, conversationRef: context.conversationId }; }
   function isSendControl(target, compose) { const control = target?.closest?.('[role="button"], button'); if (!control || !compose?.contains?.(control) || control.closest?.(".amm-voice-shell")) return false; const label = [control.getAttribute?.("aria-label"), control.getAttribute?.("data-tooltip"), textOf(control)].filter(Boolean).join(" ").trim(); return /^send(?:\s|$|\()/i.test(label) && !/^send\s+(later|options)/i.test(label) && !/more send options/i.test(label); }
   function dispatchInput(body, text, inputType) { body.dispatchEvent(new InputEvent("input", { bubbles: true, inputType, data: text })); }
   function replaceDraftBody(body, replacement) {
@@ -46,5 +86,5 @@
     const fragment = document.createDocumentFragment(); String(replacement).split("\n").forEach((line, index) => { if (index) fragment.append(document.createElement("br")); fragment.append(document.createTextNode(line)); }); body.insertBefore(fragment, body.firstChild); body.focus(); dispatchInput(body, String(replacement), "insertReplacementText"); return snapshot;
   }
   function restoreDraftBody(body, snapshot) { if (!body || !snapshot) return false; body.innerHTML = snapshot.html; body.focus(); dispatchInput(body, null, "historyUndo"); return true; }
-  return { BODY_SELECTOR, PROTECTED_SELECTOR, textOf, findBody, composeMount, composeIdentity, draftText, detectSender, recipientAddresses, recipientAddress, composeMode, composeContext, outboundContext, isSendControl, replaceDraftBody, restoreDraftBody };
+  return { BODY_SELECTOR, PROTECTED_SELECTOR, COMPOSE_BOUNDARY_SELECTOR, COMPOSE_MODES, textOf, findBody, isComposeBody, hasSendControl, composeRootForBody, composeRootForNode, findComposeRoots, composeMount, composeIdentity, ensureComposeIdentity, draftText, detectSender, recipientAddresses, recipientAddress, composeMode, composeAdapter, composeContext, outboundContext, isSendControl, replaceDraftBody, restoreDraftBody };
 });
