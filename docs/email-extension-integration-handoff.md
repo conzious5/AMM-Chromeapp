@@ -1,5 +1,73 @@
 # Email extension and identity-context handoff
 
+## Extension experience continuation — `feature/extension-experience`
+
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures) and `6eb8e9e` (accessible multi-compose UI, settings, and harness). This branch is isolated from active canonical auth/Prisma reconciliation and modifies only extension assets, extension tests/fixtures, and extension documentation.
+
+### What works now
+
+- Two distinct compose actions: AMM Style and Zac's Edit.
+- Compact inline compose panel with Suggested response, Replace Draft, Try Again, Undo, and Cancel.
+- Meaningful Zac Review notes, calm backend warning display, and conditional client-question coverage.
+- Independent `WeakMap`-backed state per Gmail compose window.
+- From-address detection with fail-closed authorized sender selection.
+- Six-message / 20,000-character thread context limits.
+- Replacement limited to draft content before Gmail signature/quote nodes; exact immediate HTML snapshot for Undo.
+- Explicit loading and recovery messages for auth, sender, draft, network, timeout, rate-limit, model, and API failures.
+- Keyboard focus styles, ARIA labels/live regions, Escape dismissal, readable contrast, reduced-motion support, and responsive sizing.
+- Settings for default action, Zac Review visibility, automatic sender detection, backend environment, and localhost-only mock authentication.
+- `ExtensionAuthProvider`, `ExtensionApiClient`, and extension telemetry interfaces.
+- Nineteen rewrite fixtures covering nine AMM Style and ten Zac's Edit scenarios.
+- Dependency-free automated tests and a backend-free two-compose interaction harness.
+
+### What is mocked
+
+- `DevelopmentAuthProvider` and authorized senders, enabled only for localhost.
+- `dev-harness.html` rewrite results, review notes, warnings, and configuration.
+- Telemetry uses a no-op implementation; no competing analytics database or endpoint was added.
+- `submitFeedback` exists at the API boundary but reports that canonical feedback wiring is unavailable.
+
+### What awaits final auth/API integration
+
+- Replace/adapt `BackendExtensionAuthProvider` when canonical native authentication lands.
+- Confirm the final current-user/config and token-refresh contracts.
+- Connect feedback/acceptance telemetry to the canonical service after event semantics are approved.
+- Perform production Gmail tests against the final backend error/status envelope.
+
+### Verification
+
+- `node --test extension/tests/*.test.cjs`: 11 tests passed.
+- All extension JavaScript passed `node --check`.
+- Manifest and the 19-scenario fixture corpus parse as JSON.
+- `extension/dev-harness.html` provides two independent compose windows for manual interaction verification. The in-app preview could not open a local file URL, so no screenshot was captured in this pass.
+
+### New files
+
+- `extension/core.js`
+- `extension/compose-adapter.js`
+- `extension/auth-provider.js`
+- `extension/extension-api-client.js`
+- `extension/telemetry.js`
+- `extension/dev-harness.html`, `extension/dev-harness.js`
+- `extension/fixtures/rewrite-scenarios.json`
+- `extension/tests/core.test.cjs`, `extension/tests/adapters.test.cjs`
+
+### Known Gmail limitations
+
+- Gmail DOM selectors are undocumented and need real-account regression coverage.
+- From detection intentionally falls back when Gmail hides or changes sender markup.
+- Thread extraction uses recent visible message nodes and may require refinement for clipped messages, pop-out compose, unusual conversation layouts, or multiple open threads.
+- Signature/quoted-content preservation covers common `.gmail_signature`, `.gmail_quote`, and smart-signature nodes; real Gmail fixture coverage is still needed.
+- Question coverage is a lightweight local token-overlap signal for review, not a factual guarantee that the reply fully answers a question.
+
+### Remaining dependencies
+
+- Canonical extension auth adapter and native token/session behavior.
+- Canonical API feedback/telemetry operations.
+- Real Gmail matrix verification and selector fixtures.
+- Stable production extension ID and distribution configuration.
+- Chrome Web Store icons, listing materials, privacy/permission disclosure, signing, and release QA.
+
 ## What was built
 
 - Chrome Manifest V3 Gmail extension for developer/unpacked installation.
