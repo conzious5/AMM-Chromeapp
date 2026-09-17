@@ -52,11 +52,11 @@
     return { code: "API", message: value || "AMM Voice could not complete the request. Your draft is unchanged." };
   }
   function sanitizeTelemetry(name, metadata = {}) {
-    const allowedNames = new Set(["extension_opened", "amm_style_requested", "zacs_edit_requested", "rewrite_accepted", "rewrite_retried", "rewrite_undone", "warning_displayed"]); if (!allowedNames.has(name)) return null;
-    const safe = {}; for (const key of ["mode", "warningCode", "result", "senderDetected", "questionCount"]) if (["string", "number", "boolean"].includes(typeof metadata[key])) safe[key] = metadata[key];
+    const allowedNames = new Set(["extension_opened", "amm_style_requested", "zacs_edit_requested", "rewrite_accepted", "rewrite_retried", "rewrite_undone", "warning_displayed", "email_sent_observed", "email_coaching_submission_started", "email_coaching_submission_succeeded", "email_coaching_submission_failed"]); if (!allowedNames.has(name)) return null;
+    const safe = {}; for (const key of ["mode", "warningCode", "result", "senderDetected", "questionCount", "composeMode", "assistanceUsed", "reasonCode"]) if (["string", "number", "boolean"].includes(typeof metadata[key])) safe[key] = metadata[key];
     return { name, metadata: safe };
   }
   function meaningfulReviewNotes(notes) { return (notes || []).map((value) => String(value || "").trim()).filter((value) => value && !/\b(grammar|spelling|punctuation|comma|capitalization|typo)\b/i.test(value)); }
-  function createComposeSession(id = "") { return { id, mode: "amm_style", busy: false, selectedSender: "", output: null, payload: null, undoSnapshot: null }; }
+  function createComposeSession(id = "") { return { id, mode: "amm_style", busy: false, selectedSender: "", output: null, payload: null, undoSnapshot: null, coachingConfig: null, coachingSendDedup: null, assistance: { ammStyleUsed: false, zacsEditUsed: false, rewriteAccepted: false, originalDraft: "", lastSuggestion: "", acceptedText: "", warningCodes: [], questionCoverageWarningDisplayed: false } }; }
   return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, extractQuestions, questionCoverage, limitThread, warningView, classifyError, sanitizeTelemetry, meaningfulReviewNotes, createComposeSession };
 });

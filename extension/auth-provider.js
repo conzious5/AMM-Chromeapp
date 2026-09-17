@@ -27,7 +27,7 @@
   class DevelopmentAuthProvider extends ExtensionAuthProvider {
     constructor(config = {}) { super(); this.config = config; this.signedIn = false; }
     async signIn() { this.signedIn = true; return this.getCurrentUser(); } async signOut() { this.signedIn = false; } async getAccessToken() { return this.signedIn ? "development-mock-token" : null; }
-    async getCurrentUser() { if (!this.signedIn) throw new Error("SIGN_IN_REQUIRED"); return { authenticatedUser: this.config.authenticatedUser || "developer@amm-voice.local", name: this.config.name || "Developer", role: "DEVELOPMENT", senderAddresses: this.config.senderAddresses || ["hello@authentic-moments.com"] }; }
+    async getCurrentUser() { if (!this.signedIn) throw new Error("SIGN_IN_REQUIRED"); return { authenticatedUser: this.config.authenticatedUser || "developer@amm-voice.local", name: this.config.name || "Developer", role: "DEVELOPMENT", senderAddresses: this.config.senderAddresses || ["hello@authentic-moments.com"], emailCoachingEnabled: this.config.emailCoachingEnabled === true }; }
   }
   return { ExtensionAuthProvider, NativeExtensionAuthProvider, DevelopmentAuthProvider };
 });

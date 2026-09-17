@@ -34,6 +34,7 @@ test("error mapping preserves actionable recovery", () => {
 
 test("telemetry strips email content and accepts only conceptual events", () => {
   assert.deepEqual(core.sanitizeTelemetry("rewrite_accepted", { mode: "amm_style", draft: "private body", thread: "private thread" }), { name: "rewrite_accepted", metadata: { mode: "amm_style" } }); assert.equal(core.sanitizeTelemetry("unknown_event", {}), null);
+  assert.deepEqual(core.sanitizeTelemetry("email_coaching_submission_failed", { composeMode: "reply", assistanceUsed: true, finalBody: "private", reasonCode: "network" }), { name: "email_coaching_submission_failed", metadata: { composeMode: "reply", assistanceUsed: true, reasonCode: "network" } });
 });
 
 test("fixture corpus covers requested AMM Style and Zac's Edit scenarios", () => {
@@ -42,5 +43,5 @@ test("fixture corpus covers requested AMM Style and Zac's Edit scenarios", () =>
 
 test("content lifecycle observes removals without polling and loads before the content script", () => {
   const content = fs.readFileSync(path.join(__dirname, "../content-script.js"), "utf8"); const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "../manifest.json"), "utf8"));
-  assert.match(content, /record\.removedNodes/); assert.match(content, /controlsAttached/); assert.doesNotMatch(content, /setInterval/); assert.deepEqual(manifest.content_scripts[0].js.slice(-2), ["compose-lifecycle.js", "content-script.js"]);
+  assert.match(content, /record\.removedNodes/); assert.match(content, /controlsAttached/); assert.doesNotMatch(content, /setInterval/); assert.deepEqual(manifest.content_scripts[0].js.slice(-3), ["compose-lifecycle.js", "outbound-coaching.js", "content-script.js"]);
 });

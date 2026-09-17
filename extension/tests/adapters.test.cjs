@@ -34,6 +34,12 @@ test("API client centralizes rewrite and expires unauthorized sessions", async (
   const unauthorized = new ExtensionApiClient({ backendUrl: "http://localhost:3000", auth, fetchImpl: async () => ({ status: 401, ok: false, async json() { return {}; } }) }); await assert.rejects(() => unauthorized.getCurrentUser(), /AUTHENTICATION_EXPIRED/); assert.equal(signedOut, true);
 });
 
+test("API client exposes one injectable outbound coaching operation with idempotency", async () => {
+  const calls = []; const auth = { async getAccessToken() { return "token"; }, async signOut() {} }; const client = new ExtensionApiClient({ backendUrl: "https://backend.example", outboundCoachingPath: "/canonical/outbound-route", auth, fetchImpl: async (url, init) => { calls.push({ url, init }); return { status: 202, ok: true, async json() { return { accepted: true }; } }; } });
+  const result = await client.submitOutboundEmailForCoaching({ eventId: "event-123", finalBody: "Private body" }); assert.equal(result.accepted, true); assert.equal(calls[0].url, "https://backend.example/canonical/outbound-route"); assert.equal(calls[0].init.headers["x-idempotency-key"], "event-123");
+  const unintegrated = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async () => { throw new Error("must not call"); } }); await assert.rejects(() => unintegrated.submitOutboundEmailForCoaching({ eventId: "event" }), /ENDPOINT_NOT_INTEGRATED/);
+});
+
 test("API client makes exactly one refresh attempt after an expired access token", async () => {
   let refreshes = 0; let requests = 0; let token = "expired";
   const auth = { async getAccessToken() { return token; }, async refreshAccessToken() { refreshes += 1; token = "fresh"; return true; }, async signOut() { throw new Error("should not sign out"); } };
@@ -91,6 +97,14 @@ test("real-Gmail body and panel anchors avoid the AI prompt and hidden toolbars"
   const sendTable = { parentElement: { id: "visible-bottom-row" } }; const send = { closest(name) { return name === "table" ? sendTable : null; } };
   const composeRoot = { querySelectorAll(selector) { return selector === compose.BODY_SELECTOR ? [body, aiPrompt] : []; }, querySelector(selector) { return selector.includes("aria-label=\"Send\"") ? send : null; } };
   assert.equal(compose.findBody(composeRoot), body); assert.deepEqual(compose.composeMount(composeRoot), { parent: sendTable.parentElement, before: sendTable });
+});
+
+test("outbound compose context reads current recipients and recognizes only Gmail Send", () => {
+  function node(attributes = {}, value = "") { return { value, getAttribute(name) { return attributes[name] || null; }, closest(selector) { if (selector === ".amm-voice-shell") return null; if (selector.includes("from") && /from/i.test(attributes["aria-label"] || "")) return this; return null; } }; }
+  const recipient = node({ email: "client@example.com" }); const cc = node({}, "producer@example.com"); const sender = node({ email: "hello@authentic-moments.com", "aria-label": "From: hello@authentic-moments.com" }); const quoted = node({ email: "old@example.com" }); const body = { getAttribute(name) { return name === "g_editable" ? "true" : null; }, cloneNode() { return { innerText: "Final body", querySelectorAll() { return []; } }; }, contains(candidate) { return candidate === quoted; } };
+  const composeRoot = { contains() { return true; }, getAttribute() { return "compose-1"; }, querySelector(selector) { if (selector === 'input[name="subjectbox"]') return { value: "Re: Details" }; return null; }, querySelectorAll(selector) { if (selector === compose.BODY_SELECTOR) return [body]; if (selector.includes("[email]")) return [recipient, cc, sender, quoted]; return []; } };
+  const result = compose.outboundContext(composeRoot, { querySelectorAll() { return []; }, querySelector() { return null; } }); assert.deepEqual(result.recipientAddresses, ["client@example.com", "producer@example.com"]); assert.equal(result.finalBody, "Final body"); assert.equal(result.composeMode, "reply");
+  const send = node({ "aria-label": "Send" }); send.closest = (selector) => selector.includes("role") ? send : null; const sendLater = node({ "aria-label": "Send Later" }); sendLater.closest = (selector) => selector.includes("role") ? sendLater : null; assert.equal(compose.isSendControl(send, composeRoot), true); assert.equal(compose.isSendControl(sendLater, composeRoot), false);
 });
 
 test("extension implementation contains no Gmail Send interaction", () => {

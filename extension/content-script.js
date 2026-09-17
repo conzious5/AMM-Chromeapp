@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const Core = AMMVoiceCore; const Gmail = AMMVoiceCompose; const Lifecycle = AMMVoiceComposeLifecycle;
+  const Core = AMMVoiceCore; const Gmail = AMMVoiceCompose; const Lifecycle = AMMVoiceComposeLifecycle; const Coaching = AMMVoiceOutboundCoaching;
 
   async function call(type, payload) {
     const response = await chrome.runtime.sendMessage({ type, payload });
@@ -8,6 +8,7 @@
     return response.result;
   }
   function emit(name, metadata) { chrome.runtime.sendMessage({ type: "TELEMETRY", name, metadata }).catch(() => {}); }
+  async function submitOutboundCoaching(payload) { const response = await chrome.runtime.sendMessage({ type: "SUBMIT_OUTBOUND_EMAIL_COACHING", payload }); if (!response?.ok) throw new Error(response?.error || "EMAIL_COACHING_SUBMISSION_FAILED"); return response.result; }
   async function extensionSettings() { const saved = await chrome.storage.local.get(Object.keys(Core.SETTINGS_DEFAULTS)); return { ...Core.SETTINGS_DEFAULTS, ...saved }; }
   function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node; }
   function button(text, className, label = text) { const node = element("button", className, text); node.type = "button"; node.setAttribute("aria-label", label); return node; }
@@ -57,18 +58,20 @@
   }
   function listItems(list, values) { list.replaceChildren(); values.forEach((value) => { const item = element("li", "", value); list.append(item); }); }
   function renderResult(state, output) {
-    const ui = state.ui; state.output = output; ui.result.hidden = false; ui.footer.hidden = false; ui.continueButton.hidden = true; ui.suggested.textContent = output.rewrittenText || "";
-    const warningViews = (output.warnings || []).map(Core.warningView); listItems(ui.warningList, warningViews.map((item) => item.message)); ui.warnings.hidden = warningViews.length === 0; warningViews.forEach((item) => emit("warning_displayed", { mode: state.mode, warningCode: item.code }));
+    const ui = state.ui; state.output = output; state.assistance.lastSuggestion = output.rewrittenText || ""; ui.result.hidden = false; ui.footer.hidden = false; ui.continueButton.hidden = true; ui.suggested.textContent = output.rewrittenText || "";
+    const warningViews = (output.warnings || []).map(Core.warningView); state.assistance.warningCodes = [...new Set([...state.assistance.warningCodes, ...warningViews.map((item) => item.code)])]; listItems(ui.warningList, warningViews.map((item) => item.message)); ui.warnings.hidden = warningViews.length === 0; warningViews.forEach((item) => emit("warning_displayed", { mode: state.mode, warningCode: item.code }));
     const reviewItems = state.mode === "zacs_edit" && state.settings.showZacReview ? Core.meaningfulReviewNotes(output.reviewNotes) : []; listItems(ui.reviewList, reviewItems); ui.review.hidden = reviewItems.length === 0;
     const detected = Core.extractQuestions(state.context.thread); const coverage = Core.questionCoverage(detected, output.rewrittenText); const useful = state.mode === "zacs_edit" && (coverage.length > 1 || coverage.some((item) => !item.covered));
-    ui.questionList.replaceChildren(); if (useful) coverage.forEach((item) => { const row = element("li", item.covered ? "is-covered" : "needs-review"); const mark = element("span", "amm-voice-question-mark", item.covered ? "✓" : "!"); mark.setAttribute("aria-label", item.covered ? "Likely covered" : "Review coverage"); row.append(mark, document.createTextNode(item.question)); ui.questionList.append(row); }); ui.questions.hidden = !useful;
+    ui.questionList.replaceChildren(); if (useful) coverage.forEach((item) => { const row = element("li", item.covered ? "is-covered" : "needs-review"); const mark = element("span", "amm-voice-question-mark", item.covered ? "✓" : "!"); mark.setAttribute("aria-label", item.covered ? "Likely covered" : "Review coverage"); row.append(mark, document.createTextNode(item.question)); ui.questionList.append(row); }); ui.questions.hidden = !useful; if (useful && coverage.some((item) => !item.covered)) state.assistance.questionCoverageWarningDisplayed = true;
     setBusy(state, false, state.context.thread ? "Review the suggestion before replacing your draft." : "No thread context was detected. Review this suggestion carefully."); ui.suggested.focus();
   }
 
-  async function configFor(_state) { return call("GET_CONFIG"); }
+  async function configFor(state) { const config = await call("GET_CONFIG"); state.coachingConfig = config; return config; }
+  function hydrateCoachingConfig(state) { configFor(state).catch(() => { state.coachingConfig = null; }); }
   async function runRewrite(state, retry = false) {
     if (state.busy) return; state.errorCode = ""; state.context = Gmail.composeContext(state.compose); state.settings = await extensionSettings(); state.ui.panel.hidden = false; state.ui.title.textContent = state.mode === "zacs_edit" ? "Zac's Edit" : "AMM Style"; state.ui.subtitle.textContent = state.mode === "zacs_edit" ? "A deeper customer-service review for clarity, questions, promises, and next steps." : "A polished Authentic Moments response with warmth, clarity, and facts intact."; state.ui.result.hidden = true; state.ui.footer.hidden = true; state.ui.continueButton.hidden = true;
     if (!state.context.body || !state.context.draft) { showError(state, new Error("NO_DRAFT")); return; }
+    if (!state.assistance.originalDraft) state.assistance.originalDraft = state.context.draft; if (state.mode === "zacs_edit") state.assistance.zacsEditUsed = true; else state.assistance.ammStyleUsed = true;
     try {
       setBusy(state, true, state.mode === "zacs_edit" ? "Analyzing the conversation…" : "Polishing your draft…"); const config = await configFor(state); state.config = config;
       const senderState = Core.resolveSender(state.context.senderAddress, config.senderAddresses || [], state.settings.autoDetectSender); renderSender(state, senderState);
@@ -86,14 +89,27 @@
     try { emit(state.mode === "zacs_edit" ? "zacs_edit_requested" : "amm_style_requested", { mode: state.mode, senderDetected: false, questionCount: Core.extractQuestions(state.context.thread).length }); renderResult(state, await call("REWRITE", payload)); } catch (error) { showError(state, error); }
   }
   function closePanel(state) { if (state.busy) return; state.ui.panel.hidden = true; state.ui.result.hidden = true; state.ui.status.textContent = ""; }
+  function observeIntentionalSend(state, event) {
+    if (event.isTrusted === false || !Gmail.isSendControl(event.target, state.compose)) return;
+    let context; try { context = Gmail.outboundContext(state.compose); } catch { return; }
+    Coaching.observeOutboundSend({ context, state, config: state.coachingConfig, submit: submitOutboundCoaching, emit });
+  }
+  function bindSendObserver(state, compose) {
+    if (state.sendObserver?.compose === compose) return; if (state.sendObserver) state.sendObserver.compose.removeEventListener("click", state.sendObserver.listener, true);
+    const listener = (event) => observeIntentionalSend(state, event); compose.addEventListener("click", listener, true); state.sendObserver = { compose, listener };
+  }
+  function clearComposeState(state) {
+    if (state.sendObserver) state.sendObserver.compose.removeEventListener("click", state.sendObserver.listener, true); state.sendObserver = null;
+    state.context = null; state.output = null; state.payload = null; state.undoSnapshot = null; state.coachingConfig = null; state.coachingSendDedup = null; state.assistance.originalDraft = ""; state.assistance.lastSuggestion = ""; state.assistance.acceptedText = "";
+  }
   function wireState(compose, ui) {
     const state = { ...Core.createComposeSession(compose.getAttribute("data-thread-perm-id") || ""), compose, ui, settings: Core.SETTINGS_DEFAULTS };
     ui.ammButton.addEventListener("click", () => { state.mode = "amm_style"; emit("extension_opened", { mode: state.mode }); runRewrite(state); }); ui.zacButton.addEventListener("click", () => { state.mode = "zacs_edit"; emit("extension_opened", { mode: state.mode }); runRewrite(state); });
     ui.close.addEventListener("click", () => closePanel(state)); ui.cancel.addEventListener("click", () => closePanel(state)); ui.sender.addEventListener("change", () => { state.selectedSender = ui.sender.value; }); ui.continueButton.addEventListener("click", () => { if (state.errorCode === "AUTH_REQUIRED") { call("OPEN_SETTINGS").catch(() => {}); return; } state.ui.senderRow.hidden ? runRewrite(state) : continueWithSender(state); });
-    ui.retry.addEventListener("click", () => runRewrite(state, true)); ui.replace.addEventListener("click", () => { if (!state.output?.rewrittenText) return; state.undoSnapshot = Gmail.replaceDraftBody(Gmail.findBody(state.compose), state.output.rewrittenText); ui.undo.disabled = false; ui.status.textContent = "Draft replaced. Review it in Gmail before sending."; emit("rewrite_accepted", { mode: state.mode }); });
+    ui.retry.addEventListener("click", () => runRewrite(state, true)); ui.replace.addEventListener("click", () => { if (!state.output?.rewrittenText) return; state.undoSnapshot = Gmail.replaceDraftBody(Gmail.findBody(state.compose), state.output.rewrittenText); state.assistance.rewriteAccepted = true; state.assistance.acceptedText = state.output.rewrittenText; ui.undo.disabled = false; ui.status.textContent = "Draft replaced. Review it in Gmail before sending."; emit("rewrite_accepted", { mode: state.mode }); });
     ui.undo.addEventListener("click", () => { if (Gmail.restoreDraftBody(Gmail.findBody(state.compose), state.undoSnapshot)) { state.undoSnapshot = null; ui.undo.disabled = true; ui.status.textContent = "The previous draft has been restored."; emit("rewrite_undone", { mode: state.mode }); } });
     ui.panel.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); closePanel(state); (state.mode === "zacs_edit" ? ui.zacButton : ui.ammButton).focus(); } });
-    extensionSettings().then((settings) => { state.settings = settings; if (settings.defaultAction === "zacs_edit") ui.actionBar.prepend(ui.zacButton); }).catch(() => {}); return state;
+    extensionSettings().then((settings) => { state.settings = settings; if (settings.defaultAction === "zacs_edit") ui.actionBar.prepend(ui.zacButton); }).catch(() => {}); bindSendObserver(state, compose); hydrateCoachingConfig(state); return state;
   }
 
   const lifecycle = Lifecycle.createComposeLifecycle({
@@ -101,8 +117,8 @@
     createState: (compose) => wireState(compose, createPanel()),
     controlsAttached: (compose, state) => { const shells = compose.querySelectorAll(".amm-voice-shell"); return shells.length === 1 && shells[0] === state.ui.shell && state.ui.shell.isConnected && compose.contains(state.ui.shell); },
     attachControls,
-    onRebind: (state, compose) => { state.compose = compose; },
-    onCleanup: (state) => { state.ui.shell.remove(); state.compose = null; }
+    onRebind: (state, compose) => { state.compose = compose; bindSendObserver(state, compose); },
+    onCleanup: (state) => { clearComposeState(state); state.ui.shell.remove(); state.compose = null; }
   });
 
   function composeCandidates(root, candidates) {

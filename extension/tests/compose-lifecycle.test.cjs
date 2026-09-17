@@ -39,9 +39,9 @@ test("toolbar recovery remains isolated across simultaneous compose windows", ()
 });
 
 test("a safely identifiable replacement compose reuses state while a genuinely closed compose is cleaned up", () => {
-  const { lifecycle } = fixture(); const original = compose("reply-123", "Reply"); const state = lifecycle.ensure(original); state.selectedSender = "hello@authentic-moments.com"; original.connected = false;
+  const { lifecycle } = fixture(); const original = compose("reply-123", "Reply"); const state = lifecycle.ensure(original); state.selectedSender = "hello@authentic-moments.com"; state.assistance = { ammStyleUsed: true, acceptedText: "Suggestion" }; original.connected = false;
   const replacement = compose("reply-123", "Reply"); lifecycle.reconcile([replacement]);
-  assert.equal(lifecycle.stateFor(replacement), state); assert.equal(state.selectedSender, "hello@authentic-moments.com"); assert.equal(state.cleaned, undefined);
+  assert.equal(lifecycle.stateFor(replacement), state); assert.equal(state.selectedSender, "hello@authentic-moments.com"); assert.deepEqual(state.assistance, { ammStyleUsed: true, acceptedText: "Suggestion" }); assert.equal(state.cleaned, undefined);
   replacement.connected = false; lifecycle.cleanupDisconnected(); assert.equal(state.cleaned, true); assert.equal(lifecycle.liveStateCount(), 0);
 });
 

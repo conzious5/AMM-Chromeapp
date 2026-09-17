@@ -31,6 +31,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "GET_CONFIG") return client.getCurrentUser();
     if (message.type === "REWRITE") return client.rewriteEmail(message.payload);
     if (message.type === "RETRY_REWRITE") return client.retryRewrite(message.payload);
+    if (message.type === "SUBMIT_OUTBOUND_EMAIL_COACHING") return client.submitOutboundEmailForCoaching(message.payload);
     if (message.type === "SUBMIT_FEEDBACK") return client.submitFeedback(message.payload);
     if (message.type === "TELEMETRY") { await telemetry.record(message.name, message.metadata); return { accepted: true }; }
     if (message.type === "OPEN_SETTINGS") { await chrome.runtime.openOptionsPage(); return { opened: true }; }
