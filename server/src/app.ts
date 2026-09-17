@@ -11,8 +11,9 @@ import type { AuthService } from "./services/auth.js";
 import type { RewriteService } from "./services/rewriteService.js";
 import type { AnalyticsRepository } from "./services/analyticsRepository.js";
 import { registerPortalAuth, requirePortalUser } from "./services/portalAuth.js";
+import type { NativeAuthService } from "./services/nativeAuth.js";
 
-export async function buildApp(input: { config: AppConfig; auth: AuthService; rewriteService: RewriteService; analytics: AnalyticsRepository }) {
+export async function buildApp(input: { config: AppConfig; auth: AuthService; nativeAuth: NativeAuthService; rewriteService: RewriteService; analytics: AnalyticsRepository }) {
   const app = Fastify({
     logger: {
       level: input.config.NODE_ENV === "test" ? "silent" : "info",
@@ -23,13 +24,14 @@ export async function buildApp(input: { config: AppConfig; auth: AuthService; re
   const origins = input.config.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean);
   await app.register(cors, { origin: origins.length ? origins : false });
   await app.register(rateLimit, { max: input.config.RATE_LIMIT_MAX, timeWindow: input.config.RATE_LIMIT_WINDOW });
-  await registerPortalAuth(app, input.config, input.analytics);
+  await registerPortalAuth(app, input.config, input.analytics, input.nativeAuth);
+  const portalUser = requirePortalUser(input.nativeAuth);
 
   app.get("/health", async () => ({ status: "ok" }));
 
   async function authenticate(header: string | undefined) { return input.auth.authenticate(header); }
 
-  function senderPermissions(email: string): string[] {
+  function configuredSenderPermissions(email: string): string[] {
     try {
       const permissions = JSON.parse(input.config.USER_SENDER_PERMISSIONS_JSON) as Record<string, unknown>;
       const values = permissions[email.toLowerCase()];
@@ -37,10 +39,14 @@ export async function buildApp(input: { config: AppConfig; auth: AuthService; re
     } catch { return [email.toLowerCase()]; }
   }
 
+  async function senderPermissions(principal: { id: string; email: string; role?: string }): Promise<string[]> {
+    return principal.role === "DEVELOPMENT" ? configuredSenderPermissions(principal.email) : input.nativeAuth.senderAddresses(principal.id, principal.email);
+  }
+
   app.get("/api/extension/config", async (request, reply) => {
     const principal = await authenticate(request.headers.authorization);
     if (!principal) return reply.code(401).send({ error: "Unauthorized" });
-    return { authenticatedUser: principal.email, name: principal.name ?? principal.email, role: principal.role ?? "TEAM", senderAddresses: senderPermissions(principal.email) };
+    return { authenticatedUser: principal.email, name: principal.name ?? principal.email, role: principal.role ?? "TEAM", senderAddresses: await senderPermissions(principal) };
   });
 
   app.post("/api/rewrite", async (request, reply) => {
@@ -50,7 +56,7 @@ export async function buildApp(input: { config: AppConfig; auth: AuthService; re
     if (!principal) return reply.code(401).send({ success: false, error: "Unauthorized", requestId });
     const parsed = rewriteRequestSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: "Invalid request", details: parsed.error.flatten(), requestId });
-    if (parsed.data.senderAddress && !senderPermissions(principal.email).includes(parsed.data.senderAddress.toLowerCase())) {
+    if (parsed.data.senderAddress && !(await senderPermissions(principal)).includes(parsed.data.senderAddress.toLowerCase())) {
       return reply.code(403).send({ success: false, error: "Sender address is not permitted for this user", requestId });
     }
     try {
@@ -80,13 +86,13 @@ export async function buildApp(input: { config: AppConfig; auth: AuthService; re
     }
   });
 
-  app.get("/api/portal/overview", { preHandler: requirePortalUser }, async (request) => {
+  app.get("/api/portal/overview", { preHandler: portalUser }, async (request) => {
     const query = request.query as { days?: string; source?: "LIVE" | "HISTORICAL_CORPUS"; authenticatedUser?: string; senderAddress?: string };
     const days = Math.min(Math.max(Number(query.days) || 30, 1), 365);
     return input.analytics.overview(days, query.source ?? "LIVE", { ...(query.authenticatedUser ? { authenticatedUser: query.authenticatedUser } : {}), ...(query.senderAddress ? { senderAddress: query.senderAddress } : {}) });
   });
 
-  app.get("/api/portal/metric-definitions", { preHandler: requirePortalUser }, async () => ({
+  app.get("/api/portal/metric-definitions", { preHandler: portalUser }, async () => ({
     oneReplyResolutionRate: { type: "AI_CLASSIFICATION", definition: "Share of substantive questions or issues that appear resolved by AMM's next response without another clarification on the same issue.", limitation: "Approximate; acknowledgments such as ‘Thanks’ are excluded from unresolved follow-ups." },
     attentionFlags: { type: "AI_CLASSIFICATION", definition: "Observable signals such as repeated follow-ups, explicit concern, unresolved confusion, or a missed expectation.", limitation: "A flag requests review and does not establish client sentiment." },
     usageCounts: { type: "MEASURED_DATA", definition: "Completed AMM Style and Zac's Edit operations recorded by the live application.", limitation: "Activity before analytics storage was enabled is not included." }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rewriteRequestSchema } from "../src/schemas/rewrite.js";
-import { issueExtensionToken, SignedTokenAuth } from "../src/services/auth.js";
+import { hashPassword, normalizeEmail, verifyPassword } from "../src/services/nativeAuth.js";
 
 describe("identity and sender context", () => {
   it("keeps authenticated identity out of the client-controlled rewrite body", () => {
@@ -21,11 +21,12 @@ describe("identity and sender context", () => {
     expect(result.senderAddress).toBe("hello@authentic-moments.com");
   });
 
-  it("derives the human user from a signed authentication token", async () => {
-    const secret = "a-development-secret-that-is-at-least-32-characters";
-    const token = issueExtensionToken({ id: "google-subject", email: "cylina@authentic-moments.com", name: "Cylina", role: "TEAM" }, secret);
-    const principal = await new SignedTokenAuth(secret).authenticate(`Bearer ${token}`);
-    expect(principal?.email).toBe("cylina@authentic-moments.com");
-    expect(principal?.id).toBe("google-subject");
+  it("normalizes login emails and verifies Argon2id password hashes", async () => {
+    const password = "a-long-private-password";
+    const hash = await hashPassword(password);
+    expect(normalizeEmail("  Cylina@Authentic-Moments.com ")).toBe("cylina@authentic-moments.com");
+    expect(hash).toMatch(/^\$argon2id\$/);
+    expect(await verifyPassword(hash, password)).toBe(true);
+    expect(await verifyPassword(hash, "not-the-password")).toBe(false);
   });
 });

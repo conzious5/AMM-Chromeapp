@@ -20,7 +20,7 @@ pnpm test
 pnpm dev
 ```
 
-Local API testing can use `Authorization: Bearer <DEV_AUTH_TOKEN>` on `POST /api/rewrite`. The Chrome extension authenticates each employee through Google and uses a short-lived signed backend token. `GET /health` is public.
+Local API testing can use `Authorization: Bearer <DEV_AUTH_TOKEN>` on `POST /api/rewrite`. In production, the portal and Chrome extension use native AMM Voice email/password authentication backed by Railway PostgreSQL. The extension receives short-lived, revocable backend tokens and never stores the plaintext password. `GET /health` is public.
 
 ## Chrome extension MVP
 
@@ -30,4 +30,4 @@ See [docs/architecture.md](docs/architecture.md), [docs/corpus-import.md](docs/c
 
 ## Management portal
 
-The same Railway service hosts the authenticated React portal and Fastify API. Google OAuth is allowlisted with `ADMIN_EMAILS` and `TEAM_EMAILS`; analytics are stored as structured, privacy-minimized PostgreSQL records through Prisma. See [docs/portal-setup.md](docs/portal-setup.md).
+The same Railway service hosts the authenticated React portal and Fastify API. Passwords are hashed with Argon2id, sessions and role authorization are enforced by the backend, and analytics are stored as structured, privacy-minimized PostgreSQL records through Prisma. No Google Cloud service is used for authentication. See [docs/portal-setup.md](docs/portal-setup.md).

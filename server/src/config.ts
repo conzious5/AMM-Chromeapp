@@ -15,12 +15,8 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW: z.string().default("1 minute"),
   DATABASE_URL: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
-  SESSION_SECRET: z.string().min(32).default("development-session-secret-change-me"),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  ADMIN_EMAILS: z.string().default(""),
-  TEAM_EMAILS: z.string().default(""),
-  EXTENSION_IDS: z.string().default(""),
+  BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).max(256).optional(),
+  BOOTSTRAP_TEAM_PASSWORD: z.string().min(12).max(256).optional(),
   USER_SENDER_PERMISSIONS_JSON: z.string().default("{}")
 });
 

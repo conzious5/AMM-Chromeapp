@@ -17,6 +17,57 @@ enum DataSource {
   HISTORICAL_CORPUS
 }
 
+enum AuthSessionType {
+  PORTAL
+  EXTENSION
+}
+
+model User {
+  id                 String                 @id @default(cuid())
+  email              String                 @unique
+  passwordHash       String
+  displayName        String
+  role               UserRole
+  active             Boolean                @default(true)
+  failedLoginCount   Int                    @default(0)
+  lockedUntil        DateTime?
+  passwordChangedAt  DateTime               @default(now())
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  sessions           AuthSession[]
+  senderPermissions  UserSenderPermission[]
+
+  @@index([active, role])
+}
+
+model UserSenderPermission {
+  id            String   @id @default(cuid())
+  userId        String
+  senderAddress String
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, senderAddress])
+  @@index([senderAddress])
+}
+
+model AuthSession {
+  id               String          @id @default(cuid())
+  userId           String
+  type             AuthSessionType
+  tokenHash        String          @unique
+  refreshTokenHash String?         @unique
+  tokenExpiresAt   DateTime
+  expiresAt        DateTime
+  createdAt        DateTime        @default(now())
+  lastUsedAt       DateTime        @default(now())
+  revokedAt        DateTime?
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, revokedAt])
+  @@index([expiresAt])
+}
+
 model AnalyticsEvent {
   id                      String     @id @default(cuid())
   requestId               String     @unique
