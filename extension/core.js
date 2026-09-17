@@ -55,6 +55,7 @@
     const safe = {}; for (const key of ["mode", "warningCode", "result", "senderDetected", "questionCount"]) if (["string", "number", "boolean"].includes(typeof metadata[key])) safe[key] = metadata[key];
     return { name, metadata: safe };
   }
+  function meaningfulReviewNotes(notes) { return (notes || []).map((value) => String(value || "").trim()).filter((value) => value && !/\b(grammar|spelling|punctuation|comma|capitalization|typo)\b/i.test(value)); }
   function createComposeSession(id = "") { return { id, mode: "amm_style", busy: false, selectedSender: "", output: null, payload: null, undoSnapshot: null }; }
-  return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, extractQuestions, questionCoverage, limitThread, warningView, classifyError, sanitizeTelemetry, createComposeSession };
+  return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, extractQuestions, questionCoverage, limitThread, warningView, classifyError, sanitizeTelemetry, meaningfulReviewNotes, createComposeSession };
 });

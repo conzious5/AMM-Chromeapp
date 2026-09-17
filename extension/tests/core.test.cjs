@@ -25,6 +25,7 @@ test("question coverage and calm warnings are UI-ready", () => {
   const questions = core.extractQuestions("When will the teaser be ready? Can we buy raw footage? Do you need another song?"); assert.equal(questions.length, 3);
   const coverage = core.questionCoverage(questions, "The teaser should be ready next week, and raw footage can be purchased."); assert.equal(coverage.some((item) => !item.covered), true);
   assert.match(core.warningView("UNSUPPORTED_PROMISE").message, /Potential promise/);
+  assert.deepEqual(core.meaningfulReviewNotes(["Fixed a comma.", "The draft does not explain what happens next."]), ["The draft does not explain what happens next."]);
 });
 
 test("error mapping preserves actionable recovery", () => {
