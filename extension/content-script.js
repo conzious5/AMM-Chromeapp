@@ -37,7 +37,7 @@
     const replace = button("Replace Draft", "amm-voice-button amm-voice-button--primary"); const retry = button("Try Again", "amm-voice-button amm-voice-button--secondary"); const undo = button("Undo", "amm-voice-button amm-voice-button--secondary"); undo.disabled = true; const cancel = button("Cancel", "amm-voice-button amm-voice-button--quiet"); footer.append(replace, retry, undo, cancel);
     panel.append(header, senderRow, status, continueButton, result, footer); shell.append(actionBar, panel);
 
-    const toolbar = compose.querySelector('[role="toolbar"]'); (toolbar?.parentElement || compose).prepend(shell);
+    const mount = Gmail.composeMount(compose); if (mount.before) mount.parent.insertBefore(shell, mount.before); else mount.parent.prepend(shell);
     return { shell, actionBar, panel, ammButton, zacButton, close, title, subtitle, senderRow, sender, status, continueButton, result, suggested, warnings, warningList, review, reviewList, questions, questionList, footer, replace, retry, undo, cancel };
   }
 
@@ -91,7 +91,7 @@
     ui.panel.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.preventDefault(); closePanel(state); (state.mode === "zacs_edit" ? ui.zacButton : ui.ammButton).focus(); } });
     extensionSettings().then((settings) => { state.settings = settings; if (settings.defaultAction === "zacs_edit") ui.actionBar.prepend(ui.zacButton); }).catch(() => {}); composeStates.set(compose, state); return state;
   }
-  function enhance(compose) { if (composeStates.has(compose) || !Gmail.findBody(compose) || !compose.querySelector('[role="toolbar"]')) return; wireState(compose, createPanel(compose)); }
+  function enhance(compose) { if (composeStates.has(compose) || !Gmail.findBody(compose)) return; wireState(compose, createPanel(compose)); }
   function scan(root = document) { if (root.matches?.('[role="dialog"]')) enhance(root); root.querySelectorAll?.('[role="dialog"]').forEach(enhance); }
   const observer = new MutationObserver((records) => { records.forEach((record) => record.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) scan(node); })); });
   observer.observe(document.documentElement, { childList: true, subtree: true }); scan();

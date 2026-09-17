@@ -22,14 +22,48 @@ test("native auth keeps rotating tokens in session storage and never stores the 
 
 test("API client centralizes rewrite and expires unauthorized sessions", async () => {
   let signedOut = false; const auth = { async getAccessToken() { return "token"; }, async signOut() { signedOut = true; } };
-  const okClient = new ExtensionApiClient({ backendUrl: "http://localhost:3000/", auth, fetchImpl: async (url, init) => ({ status: 200, ok: true, async json() { return { url, method: init.method, payload: JSON.parse(init.body) }; } }) });
+  const okClient = new ExtensionApiClient({ backendUrl: "http://localhost:3000/", auth, fetchImpl: async (url, init) => ({ status: 200, ok: true, async json() { return { url, method: init.method, payload: JSON.parse(init.body), rewrittenText: "Safe rewrite", reviewNotes: [], warnings: [] }; } }) });
   const result = await okClient.retryRewrite({ mode: "zacs_edit", draft: "Draft" }); assert.equal(result.url, "http://localhost:3000/api/rewrite"); assert.equal(result.payload.mode, "zacs_edit");
   const unauthorized = new ExtensionApiClient({ backendUrl: "http://localhost:3000", auth, fetchImpl: async () => ({ status: 401, ok: false, async json() { return {}; } }) }); await assert.rejects(() => unauthorized.getCurrentUser(), /AUTHENTICATION_EXPIRED/); assert.equal(signedOut, true);
+});
+
+test("API client makes exactly one refresh attempt after an expired access token", async () => {
+  let refreshes = 0; let requests = 0; let token = "expired";
+  const auth = { async getAccessToken() { return token; }, async refreshAccessToken() { refreshes += 1; token = "fresh"; return true; }, async signOut() { throw new Error("should not sign out"); } };
+  const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async (_url, init) => { requests += 1; if (init.headers.authorization === "Bearer expired") return { status: 401, ok: false, async json() { return {}; } }; return { status: 200, ok: true, async json() { return { authenticatedUser: "cylina@authentic-moments.com", senderAddresses: ["cylina@authentic-moments.com"] }; } }; } });
+  const config = await client.getCurrentUser(); assert.equal(config.authenticatedUser, "cylina@authentic-moments.com"); assert.equal(refreshes, 1); assert.equal(requests, 2);
+});
+
+test("failed refresh clears native session and revoked authentication fails safely", async () => {
+  const values = { accessToken: "expired", refreshToken: "revoked", currentUser: { email: "cylina@authentic-moments.com" } };
+  const chromeApi = { storage: { session: { async get(keys) { return Object.fromEntries(keys.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async () => ({ ok: false, status: 401, async json() { return { error: "Invalid refresh token" }; } }));
+  assert.equal(await auth.refreshAccessToken(), false); assert.deepEqual(values, {});
+});
+
+test("malformed API success responses are rejected without producing replaceable text", async () => {
+  const auth = { async getAccessToken() { return "token"; }, async signOut() {} };
+  const client = new ExtensionApiClient({ backendUrl: "https://backend.example", auth, fetchImpl: async () => ({ status: 200, ok: true, async json() { return { success: true }; } }) });
+  await assert.rejects(() => client.rewriteEmail({ mode: "amm_style", draft: "Safe original" }), /MALFORMED_REWRITE_RESPONSE/);
+});
+
+test("logout clears local auth state even when the backend is unavailable", async () => {
+  const values = { accessToken: "access", refreshToken: "refresh", currentUser: { email: "cylina@authentic-moments.com" } };
+  const chromeApi = { storage: { session: { async get(keys) { return Object.fromEntries(keys.filter((key) => key in values).map((key) => [key, values[key]])); }, async set(next) { Object.assign(values, next); }, async remove(keys) { keys.forEach((key) => delete values[key]); } } } };
+  const auth = new NativeExtensionAuthProvider(chromeApi, async () => ({ backendUrl: "https://backend.example" }), async () => { throw new Error("offline"); });
+  await auth.signOut(); assert.deepEqual(values, {});
 });
 
 test("draft extraction excludes signature and quoted thread nodes", () => {
   const clone = { querySelectorAll() { return [{ remove() { clone.innerText = "Current draft"; } }, { remove() {} }]; }, innerText: "Current draft\nSignature\nQuoted history" };
   const body = { cloneNode() { return clone; } }; assert.equal(compose.draftText(body), "Current draft");
+});
+
+test("real-Gmail body and panel anchors avoid the AI prompt and hidden toolbars", () => {
+  const aiPrompt = { getAttribute(name) { return name === "aria-label" ? "Describe your message" : null; } }; const body = { getAttribute(name) { return name === "g_editable" ? "true" : name === "aria-label" ? "Message Body" : null; } };
+  const sendTable = { parentElement: { id: "visible-bottom-row" } }; const send = { closest(name) { return name === "table" ? sendTable : null; } };
+  const composeRoot = { querySelectorAll(selector) { return selector === compose.BODY_SELECTOR ? [body, aiPrompt] : []; }, querySelector(selector) { return selector.includes("aria-label=\"Send\"") ? send : null; } };
+  assert.equal(compose.findBody(composeRoot), body); assert.deepEqual(compose.composeMount(composeRoot), { parent: sendTable.parentElement, before: sendTable });
 });
 
 test("extension implementation contains no Gmail Send interaction", () => {

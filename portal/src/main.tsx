@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   Activity, AlertTriangle, BarChart3, BookOpen, BrainCircuit, ChevronDown,
   CircleUserRound, FileText, Gauge, Inbox, LogOut, MessageSquareText,
-  Search, Settings, ShieldCheck, Sparkles, UsersRound
+  KeyRound, Search, Settings, ShieldCheck, Sparkles, UsersRound
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import "./styles.css";
 
-type User = { email: string; name: string; role: "ADMIN" | "TEAM" };
+type User = { id: string; email: string; name: string; role: "ADMIN" | "TEAM" };
 type Overview = {
   databaseReady: boolean;
   measured: Record<string, number | null>;
@@ -41,7 +41,19 @@ function EmptyState({ title, children }: { title: string; children: React.ReactN
   return <div className="empty-state"><div className="empty-icon"><BarChart3 size={20} /></div><strong>{title}</strong><p>{children}</p></div>;
 }
 
-function Login({ oauthReady }: { oauthReady: boolean }) {
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); setLoading(true); setError("");
+    const response = await fetch("/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password, remember }) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { setError(body.error ?? "Sign in failed."); setLoading(false); return; }
+    location.reload();
+  }
   return <main className="login-shell">
     <section className="login-panel" aria-labelledby="login-title">
       <div className="brand-mark"><BrainCircuit size={26} aria-hidden="true" /></div>
@@ -49,13 +61,71 @@ function Login({ oauthReady }: { oauthReady: boolean }) {
       <h1 id="login-title">AMM Voice</h1>
       <p className="login-subtitle">Communication Intelligence</p>
       <p className="login-copy">Understand client questions, communication patterns, and the moments that deserve your attention.</p>
-      <a className={`google-button ${oauthReady ? "" : "disabled"}`} href={oauthReady ? "/auth/google" : undefined} aria-disabled={!oauthReady}>
-        <span className="google-g">G</span> Continue with Google
-      </a>
-      {!oauthReady && <div className="setup-note"><AlertTriangle size={17} /><span>Google sign-in is awaiting administrator configuration.</span></div>}
+      <form className="login-form" onSubmit={submit}>
+        <label>Email<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
+        <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+        <label className="remember"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Remember me on this device</label>
+        {error && <div className="form-error" role="alert"><AlertTriangle size={17} />{error}</div>}
+        <button className="primary-button" type="submit" disabled={loading}><KeyRound size={18} />{loading ? "Signing in…" : "Sign In"}</button>
+      </form>
       <div className="security-note"><ShieldCheck size={16} /> Access is limited to approved AMM accounts.</div>
     </section>
   </main>;
+}
+
+type ManagedUser = User & { active: boolean; senderAddresses: string[] };
+
+function SettingsPage({ user }: { user: User }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [message, setMessage] = useState("");
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [resets, setResets] = useState<Record<string, string>>({});
+  const [newUser, setNewUser] = useState({ email: "", displayName: "", role: "TEAM" as "ADMIN" | "TEAM", password: "", senderAddresses: "" });
+  async function loadUsers() {
+    const response = await fetch("/api/admin/users");
+    const body = response.ok ? await response.json() : { users: [] };
+    setUsers(body.users);
+  }
+  useEffect(() => { if (user.role === "ADMIN") void loadUsers(); }, [user.role]);
+  async function changePassword(event: React.FormEvent) {
+    event.preventDefault(); setMessage("");
+    if (newPassword !== confirmation) { setMessage("New passwords do not match."); return; }
+    const response = await fetch("/auth/change-password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ currentPassword, newPassword }) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { setMessage(body.error ?? "Password change failed."); return; }
+    location.reload();
+  }
+  async function logoutAll() { await fetch("/auth/logout-all", { method: "POST" }); location.reload(); }
+  async function resetTeamPassword(target: ManagedUser) {
+    const password = resets[target.id] ?? "";
+    const response = await fetch(`/api/admin/users/${target.id}/reset-password`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
+    const body = await response.json().catch(() => ({}));
+    setMessage(response.ok ? `Password reset for ${target.email}; all of their sessions were revoked.` : body.error ?? "Password reset failed.");
+    if (response.ok) setResets((value) => ({ ...value, [target.id]: "" }));
+  }
+  async function createUser(event: React.FormEvent) {
+    event.preventDefault(); setMessage("");
+    const senderAddresses = newUser.senderAddresses.split(",").map((value) => value.trim()).filter(Boolean);
+    const response = await fetch("/api/admin/users", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: newUser.email, displayName: newUser.displayName, role: newUser.role, password: newUser.password, ...(senderAddresses.length ? { senderAddresses } : {}) })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { setMessage(body.error ?? "User creation failed."); return; }
+    setMessage(`Authorized account created for ${body.user.email}.`);
+    setNewUser({ email: "", displayName: "", role: "TEAM", password: "", senderAddresses: "" });
+    await loadUsers();
+  }
+  return <><header className="page-header"><div><div className="eyebrow">AMM Voice</div><h1>Settings</h1><p>Account security and authorized-user administration.</p></div></header>
+    {message && <div className="notice" role="status"><ShieldCheck size={18} /><div><strong>{message}</strong></div></div>}
+    <section className="settings-grid">
+      <article className="panel settings-panel"><div className="panel-heading"><div><h2>Change password</h2><p>Changing your password signs out every current session.</p></div></div><form className="settings-form" onSubmit={changePassword}><label>Current password<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label><label>New password<input type="password" autoComplete="new-password" minLength={12} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label><label>Confirm new password<input type="password" autoComplete="new-password" minLength={12} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required /></label><button className="primary-button" type="submit">Change password</button></form><button className="danger-button" onClick={logoutAll}>Sign out all sessions</button></article>
+      {user.role === "ADMIN" && <article className="panel settings-panel admin-users"><div className="panel-heading"><div><h2>Authorized users</h2><p>Roles are stored and enforced by the server.</p></div></div>{users.map((managed) => <div className="managed-user" key={managed.id}><div><strong>{managed.name}</strong><span>{managed.email} · {managed.role}</span><small>Senders: {managed.senderAddresses.join(", ")}</small></div>{managed.role === "TEAM" && <div className="reset-row"><input aria-label={`New password for ${managed.email}`} type="password" minLength={12} placeholder="Temporary password" value={resets[managed.id] ?? ""} onChange={(event) => setResets((value) => ({ ...value, [managed.id]: event.target.value }))} /><button className="secondary-button" onClick={() => resetTeamPassword(managed)}>Reset password</button></div>}</div>)}</article>}
+      {user.role === "ADMIN" && <article className="panel settings-panel create-user-panel"><div className="panel-heading"><div><h2>Create authorized user</h2><p>There is no public registration. Share the temporary password securely and have the user change it after sign-in.</p></div></div><form className="settings-form user-form" onSubmit={createUser}><label>Display name<input value={newUser.displayName} onChange={(event) => setNewUser((value) => ({ ...value, displayName: event.target.value }))} required /></label><label>Email<input type="email" value={newUser.email} onChange={(event) => setNewUser((value) => ({ ...value, email: event.target.value }))} required /></label><label>Role<select value={newUser.role} onChange={(event) => setNewUser((value) => ({ ...value, role: event.target.value as "ADMIN" | "TEAM" }))}><option value="TEAM">TEAM</option><option value="ADMIN">ADMIN</option></select></label><label>Temporary password<input type="password" minLength={12} autoComplete="new-password" value={newUser.password} onChange={(event) => setNewUser((value) => ({ ...value, password: event.target.value }))} required /></label><label className="wide-field">Authorized sender addresses <span>(comma separated; defaults to the login email)</span><input value={newUser.senderAddresses} onChange={(event) => setNewUser((value) => ({ ...value, senderAddresses: event.target.value }))} placeholder="person@example.com, shared@example.com" /></label><button className="primary-button" type="submit">Create authorized user</button></form></article>}
+    </section>
+  </>;
 }
 
 function OverviewPage({ data, days, setDays, onViewConversations }: { data: Overview | null; days: number; setDays: (days: number) => void; onViewConversations: () => void }) {
@@ -88,7 +158,7 @@ function PlaceholderPage({ name }: { name: string }) {
     Conversations: "Searchable privacy-minimized conversation references and drill-downs will appear here.",
     "Insights & Reports": "Weekly, monthly, and quarterly reports will be generated from structured data here.",
     Training: "Voice profile versions, corpus coverage, and reviewed training candidates will appear here.",
-    Settings: "Approved users, roles, model configuration, retention, thresholds, and privacy controls will appear here."
+    Settings: "Account security and administration are available here."
   };
   return <><header className="page-header"><div><div className="eyebrow">AMM Voice</div><h1>{name}</h1><p>{copy[name]}</p></div></header><article className="panel placeholder-panel"><EmptyState title="Ready for real data">This section is wired into the authenticated portal shell and will populate as its structured events become available.</EmptyState></article></>;
 }
@@ -103,15 +173,15 @@ function Dashboard({ user }: { user: User }) {
     <a className="skip-link" href="#main-content">Skip to main content</a>
     <aside className="sidebar"><div className="brand"><div className="brand-mark small"><BrainCircuit size={20} /></div><div><strong>AMM Voice</strong><span>Communication Intelligence</span></div></div><nav aria-label="Portal navigation">{sections.map(([name, Icon]) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><Icon size={18} /><span>{name}</span></button>)}</nav><div className="sidebar-footer"><div className="profile"><span className="avatar">{initials}</span><div><strong>{user.name}</strong><span>{user.role}</span></div></div><button className="logout" aria-label="Sign out" onClick={() => fetch("/auth/logout", { method: "POST" }).then(() => location.reload())}><LogOut size={18} /></button></div></aside>
     <div className="mobile-bar"><div className="brand-mark small"><BrainCircuit size={19} /></div><strong>AMM Voice</strong><label className="mobile-section"><span className="sr-only">Portal section</span><select value={section} onChange={(event) => setSection(event.target.value)}>{sections.map(([name]) => <option key={name}>{name}</option>)}</select><ChevronDown size={14} /></label><button aria-label="Sign out" onClick={() => fetch("/auth/logout", { method: "POST" }).then(() => location.reload())}><CircleUserRound /></button></div>
-    <main className="content" id="main-content"><div className="utility-bar"><label className="search"><Search size={17} /><input aria-label="Search portal" placeholder="Search conversations and insights" /></label><span className="data-badge live">LIVE DATA</span></div>{section === "Overview" ? <OverviewPage data={data} days={days} setDays={setDays} onViewConversations={() => setSection("Conversations")} /> : <PlaceholderPage name={section} />}</main>
+    <main className="content" id="main-content"><div className="utility-bar"><label className="search"><Search size={17} /><input aria-label="Search portal" placeholder="Search conversations and insights" /></label><span className="data-badge live">LIVE DATA</span></div>{section === "Overview" ? <OverviewPage data={data} days={days} setDays={setDays} onViewConversations={() => setSection("Conversations")} /> : section === "Settings" ? <SettingsPage user={user} /> : <PlaceholderPage name={section} />}</main>
   </div>;
 }
 
 function App() {
-  const [state, setState] = useState<{ loading: boolean; user?: User; oauthReady: boolean }>({ loading: true, oauthReady: false });
-  useEffect(() => { fetch("/auth/me").then(async (response) => ({ ok: response.ok, body: await response.json() })).then(({ ok, body }) => setState({ loading: false, user: ok ? body.user : undefined, oauthReady: body.oauthReady ?? true })).catch(() => setState({ loading: false, oauthReady: false })); }, []);
+  const [state, setState] = useState<{ loading: boolean; user?: User }>({ loading: true });
+  useEffect(() => { fetch("/auth/me").then(async (response) => ({ ok: response.ok, body: await response.json() })).then(({ ok, body }) => setState({ loading: false, user: ok ? body.user : undefined })).catch(() => setState({ loading: false })); }, []);
   if (state.loading) return <div className="loading-screen"><div className="spinner" /><span>Loading AMM Voice</span></div>;
-  return state.user ? <Dashboard user={state.user} /> : <Login oauthReady={state.oauthReady} />;
+  return state.user ? <Dashboard user={state.user} /> : <Login />;
 }
 
 createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);

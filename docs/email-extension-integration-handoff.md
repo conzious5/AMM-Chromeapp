@@ -2,9 +2,19 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), and `afc8f45` (meaningful-only Zac Review filtering). This branch remains isolated and modifies only extension assets, extension tests/fixtures, and extension documentation.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), and `afc8f45` (meaningful-only Zac Review filtering). Final handoff: `ae97860`.
 
-### What works now
+### Beta validation continuation
+
+- Merged canonical `main` through production-auth deployment documentation `e06498d`; shared server, Prisma, Railway, portal, and analytics implementations were accepted unchanged.
+- Production health returned HTTP 200 and the native login UI rendered at `https://ammserver-production.up.railway.app`.
+- A production extension-login request using an intentionally invalid password returned HTTP 401 with the safe generic error `Invalid email or password.`
+- Extension auth/API tests now cover session-only token storage, no password persistence, exactly one refresh retry, refresh-token revocation, offline logout cleanup, malformed responses, and expired authentication.
+- Beta runtime files are staged under `dist/amm-voice-extension/` and zipped as `dist/AMM-Voice-Beta-v0.1.0.zip`; generated artifacts are ignored by Git.
+- Installation guide: `docs/CYLINA_EXTENSION_INSTALL.md`.
+- **BETA BLOCKED:** Valid Cylina credentials were not available to this agent, and Chrome's protected extension-management page cannot be automated. A human must load the unpacked package, sign in privately, and leave the live Gmail test session ready before the new-compose/reply/reply-all/forward, both-sender, replace/undo, and failure matrix can be certified.
+
+### What works on the feature branch
 
 - Two distinct compose actions: AMM Style and Zac's Edit.
 - Compact inline compose panel with Suggested response, Replace Draft, Try Again, Undo, and Cancel.
@@ -16,70 +26,57 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e
 - Explicit loading and recovery messages for auth, sender, draft, network, timeout, rate-limit, model, and API failures.
 - Keyboard focus styles, ARIA labels/live regions, Escape dismissal, readable contrast, reduced-motion support, and responsive sizing.
 - Settings for default action, Zac Review visibility, automatic sender detection, backend environment, and localhost-only mock authentication.
-- `ExtensionAuthProvider`, a `NativeExtensionAuthProvider` matching canonical native-auth commit `da95707`, `ExtensionApiClient`, and extension telemetry interfaces.
+- `ExtensionAuthProvider`, `NativeExtensionAuthProvider`, `ExtensionApiClient`, and extension telemetry interfaces.
 - Nineteen rewrite fixtures covering nine AMM Style and ten Zac's Edit scenarios.
 - Dependency-free automated tests and a backend-free two-compose interaction harness.
 
-### What is mocked
+### What is mocked or deferred
 
-- `DevelopmentAuthProvider` and authorized senders, enabled only for localhost.
-- `dev-harness.html` rewrite results, review notes, warnings, and configuration.
-- Telemetry uses a no-op implementation; no competing analytics database or endpoint was added.
-- `submitFeedback` exists at the API boundary but reports that canonical feedback wiring is unavailable.
+- `DevelopmentAuthProvider` and authorized senders are enabled only for localhost.
+- `dev-harness.html` provides mock results, review notes, warnings, and configuration.
+- Telemetry is a no-op; no competing analytics database or endpoint was added.
+- `submitFeedback` exists at the API boundary but canonical feedback wiring is unavailable.
+- Live Gmail new-compose inspection verified the `g_editable="true"` draft body, a visible `.aDh` panel mount, the subject field, and fail-closed From detection. Reply, reply-all, forward, changed From, and installed-extension behavior remain.
 
-### What awaits final auth/API integration
+### Canonical native-auth compatibility
 
-- Merge/reconcile the extension-only adapter and UI with canonical native-auth commit `da95707`; the implemented provider already targets its login, rotating refresh, logout, session-storage, and current-config contracts.
-- Verify the current-user/config and token-refresh contracts end to end after merge and deployment.
-- Connect feedback/acceptance telemetry to the canonical service after event semantics are approved.
-- Perform production Gmail tests against the final backend error/status envelope.
+The extension provider targets `da95707`: email/password login, `chrome.storage.session` tokens, rotating refresh, logout, and current configuration. Passwords are passed only to the login request, cleared from the form before awaiting the server, and never stored. The manifest does not request Chrome identity. Valid-user deployment verification must still exercise login, refresh, revocation, and allowed-sender flow.
 
 ### Verification
 
-- `node --test extension/tests/*.test.cjs`: 12 tests passed.
+- `node --test extension/tests/*.test.cjs`: 17 tests passed.
 - All extension JavaScript passed `node --check`.
 - Manifest and the 19-scenario fixture corpus parse as JSON.
-- `extension/dev-harness.html` provides two independent compose windows for manual interaction verification. The in-app preview could not open a local file URL, so no screenshot was captured in this pass.
-
-### New files
-
-- `extension/core.js`
-- `extension/compose-adapter.js`
-- `extension/auth-provider.js`
-- `extension/extension-api-client.js`
-- `extension/telemetry.js`
-- `extension/dev-harness.html`, `extension/dev-harness.js`
-- `extension/fixtures/rewrite-scenarios.json`
-- `extension/tests/core.test.cjs`, `extension/tests/adapters.test.cjs`
+- Static tests guard multiple-compose isolation, sender fallback, thread limits, question display, session-only auth behavior, draft extraction, privacy-safe telemetry, and absence of Gmail Send interaction.
+- Chrome exercised `extension/dev-harness.html` through a localhost-only server: both compose windows retained independent AMM Style/Zac's Edit panels, sender fallback exposed only the two authorized fixture identities, replacement preserved the signature, and Undo restored the exact prior HTML.
 
 ### Known Gmail limitations
 
-- Gmail DOM selectors are undocumented and need real-account regression coverage.
+- Gmail selectors are undocumented. Live new-compose inspection on September 16, 2026 found an additional Gmail AI prompt textbox and hidden toolbar; body selection now prefers `g_editable="true"`, and panel mounting now uses the visible Send-row container without interacting with Send.
 - From detection intentionally falls back when Gmail hides or changes sender markup.
-- Thread extraction uses recent visible message nodes and may require refinement for clipped messages, pop-out compose, unusual conversation layouts, or multiple open threads.
-- Signature/quoted-content preservation covers common `.gmail_signature`, `.gmail_quote`, and smart-signature nodes; real Gmail fixture coverage is still needed.
-- Question coverage is a lightweight local token-overlap signal for review, not a factual guarantee that the reply fully answers a question.
+- Recent visible message extraction may need refinement for clipped messages, pop-out compose, unusual layouts, or multiple open threads.
+- Signature/quote preservation covers common `.gmail_signature`, `.gmail_quote`, and smart-signature nodes; real Gmail fixtures are still required.
+- Question coverage is a lightweight local review signal, not a guarantee that a reply fully answers a question.
 
-### Remaining dependencies
+### Remaining integration dependencies
 
-- Merge verification against canonical native auth `da95707`, including refresh rotation, revocation, and session-only token storage.
-- Canonical API feedback/telemetry operations.
-- Real Gmail matrix verification and selector fixtures.
-- Stable production extension ID and distribution configuration.
-- Chrome Web Store icons, listing materials, privacy/permission disclosure, signing, and release QA.
+- Canonical native auth is merged through `e06498d`; resolved extension UI files preserve feature intent while server/auth/Prisma behavior remains canonical.
+- Verify login, refresh rotation, logout/revocation, config, and sender authorization against the deployed backend.
+- Run the real Gmail matrix: new compose, reply, reply all, forward, changed/collapsed From, shared sender, and multiple windows.
+- Approve and connect canonical feedback/telemetry semantics.
+- Prepare stable extension ID, CORS origin, store artwork/listing, permission/privacy disclosure, signing, and release QA.
 
 ## What was built
 
 - Chrome Manifest V3 Gmail extension for developer/unpacked installation.
 - Compose-window AMM Voice action, draft/thread collection, best-effort From/recipient/conversation detection, mode selection, preview, and explicit draft replacement.
-- Google OAuth extension flow through the Railway backend.
-- Signed bearer-token authentication that identifies the human employee.
+- Native AMM Voice email/password login against the existing Railway backend; no Google OAuth or `identity` permission.
+- A 15-minute opaque access token plus rotating, revocable 30-day refresh token. Tokens live in `chrome.storage.session`; the plaintext password is never stored.
 - Backend sender authorization independent of authentication.
 - Rewrite and analytics context fields for sender, recipient, and conversation.
 - Human/sender analytics grouping and portal display.
-- Railway/Google/extension setup documentation.
 
-The extension never sends email and contains no OpenAI API key.
+The extension never sends email and contains no OpenAI API key or permanent backend secret.
 
 ## Branch
 
@@ -87,52 +84,22 @@ The extension never sends email and contains no OpenAI API key.
 
 ## Important commits
 
-- `406c5a6` — Add secure management portal and extension authentication.
+- `406c5a6` — Initial management portal and extension foundation.
 - `d6748a2` — Approve production dependency builds.
+- `da95707` — Replace Google OAuth with native AMM Voice authentication and database permissions.
 
-At handoff time, three small working-tree refinements are not included in `406c5a6`: README extension clarification, compose-dialog selector narrowing, and an additional sender-authorization route test. Inspect `git diff` before integration.
+## Files added or materially changed
 
-## Files added
-
-- `extension/manifest.json`
-- `extension/service-worker.js`
-- `extension/content-script.js`
-- `extension/content-style.css`
-- `extension/options.html`
-- `extension/options.js`
-- `extension/options.css`
-- `docs/extension-setup.md`
-- `server/src/services/portalAuth.ts`
-- `server/src/services/analyticsRepository.ts`
-- `server/prisma/schema.prisma`
-- `server/prisma/migrations/20260917000000_initial_portal/migration.sql`
-- `server/prisma/migrations/20260917010000_identity_sender_split/migration.sql`
-- `server/tests/identityContext.test.ts`
-- Portal application files under `portal/`
-
-## Shared files modified
-
-- `.env.example`
-- `.gitignore`
-- `Dockerfile`
-- `README.md`
-- `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`
-- `server/package.json`
-- `server/src/app.ts`
-- `server/src/config.ts`
-- `server/src/index.ts`
-- `server/src/schemas/rewrite.ts`
-- `server/src/services/auth.ts`
-- `server/tests/app.test.ts`
-- `docs/architecture.md`
-- `docs/security-and-privacy.md`
-- `docs/portal-setup.md`
+- `extension/manifest.json`, service worker, options UI, content script, and styles.
+- `server/src/services/nativeAuth.ts`, `server/src/services/portalAuth.ts`, `server/src/services/auth.ts`.
+- `server/prisma/schema.prisma` and `server/prisma/migrations/20260917020000_native_auth/migration.sql`.
+- `server/src/app.ts`, configuration/startup, auth tests, extension/portal setup docs.
 
 ## Interfaces provided
 
 ### Authentication
 
-`AuthPrincipal` contains stable ID, human email, optional name, and role. `SignedTokenAuth` validates extension tokens; `CompositeAuth` permits signed extension auth plus the local development token adapter.
+`AuthPrincipal` contains stable database user ID, human email, optional name, and role. `NativeAuthService.authenticate` validates an opaque EXTENSION access token against its hashed, non-revoked PostgreSQL session record. Production composition excludes the local development-token adapter.
 
 ### Rewrite context
 
@@ -140,118 +107,79 @@ At handoff time, three small working-tree refinements are not included in `406c5
 
 ### Extension configuration
 
-`GET /api/extension/config` returns:
+`GET /api/extension/config` returns the authenticated human separately from their authorized sender addresses. For Cylina it should return her login identity plus both `cylina@authentic-moments.com` and `hello@authentic-moments.com`.
 
-```json
-{
-  "authenticatedUser": "cylina@authentic-moments.com",
-  "name": "Cylina",
-  "role": "TEAM",
-  "senderAddresses": [
-    "cylina@authentic-moments.com",
-    "hello@authentic-moments.com"
-  ]
-}
-```
+### Token lifecycle
 
-### Analytics overview
+- `POST /auth/extension/login`: email/password exchange for access + refresh tokens.
+- `POST /auth/extension/refresh`: consumes the current refresh token and rotates both tokens.
+- `POST /auth/extension/logout`: revokes the session identified by the bearer token.
 
-`GET /api/portal/overview` accepts optional `authenticatedUser` and `senderAddress` query filters and returns `identityBreakdown` grouped by the pair.
+The service worker retries one 401 after a successful refresh, then clears session tokens if refresh fails.
 
 ## Database requirements
 
 - PostgreSQL and Prisma.
-- Apply both committed migrations in order using `prisma migrate deploy`.
-- `AnalyticsEvent.authenticatedUser`, `senderAddress`, and `recipientAddress` are nullable for backward compatibility. New rewrite events populate the human identity.
+- Apply all committed migrations in order using `prisma migrate deploy`.
+- `UserSenderPermission` is authoritative in production. `USER_SENDER_PERMISSIONS_JSON` is development fallback only.
+- `hello@authentic-moments.com` is only a sender permission and must never be inserted as a login user.
 
 ## Authentication requirements
 
-- Every employee signs in using an individual approved company Google account.
-- `hello@authentic-moments.com` is a shared sender, not a login identity.
-- Production extension OAuth requires the exact Chrome extension ID in `EXTENSION_IDS`.
-- Sender use is denied unless listed for the authenticated employee in `USER_SENDER_PERMISSIONS_JSON`.
+- Every employee signs in with an individual AMM Voice email/password account.
+- Canonical ADMIN: `admin@authentic-moments.com`.
+- Canonical TEAM user: `cylina@authentic-moments.com`.
+- Google Cloud is not used for authentication.
+- Sender use is denied unless stored for the authenticated user in PostgreSQL.
+- Changing Gmail’s From address cannot change the access-token principal.
 
 ## Analytics requirements
 
 - Preserve human and sender as independent dimensions.
-- Do not log or persist full draft/thread bodies.
+- Do not log or persist full draft/thread bodies or credentials.
 - Retain the opaque conversation reference only when available.
 - Reports may aggregate by human, sender, or human+sender.
 
 ## Environment variables
 
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `SESSION_SECRET`
-- `PUBLIC_BASE_URL`
-- `ADMIN_EMAILS`
-- `TEAM_EMAILS`
-- `EXTENSION_IDS`
-- `USER_SENDER_PERMISSIONS_JSON`
-- `DATABASE_URL`
-- `ALLOWED_ORIGINS`
-
-## Routes
-
-- `GET /auth/extension/start`
-- `GET /auth/extension/callback`
-- `GET /api/extension/config`
-- `POST /api/rewrite`
-- `GET /api/portal/overview`
-
-Portal session routes are documented in `docs/portal-setup.md`.
+- `PUBLIC_BASE_URL`, `DATABASE_URL`, `ALLOWED_ORIGINS`.
+- `BOOTSTRAP_ADMIN_PASSWORD` and `BOOTSTRAP_TEAM_PASSWORD` only during one-time account creation.
+- `DEV_AUTH_TOKEN` and `USER_SENDER_PERMISSIONS_JSON` only for local development behavior.
+- Google client secrets, OAuth callbacks, `SESSION_SECRET`, email allowlists, and `EXTENSION_IDS` are obsolete and removed.
 
 ## UI integration requirements
 
 - Load `extension/` as an unpacked extension for MVP testing.
+- Configure its exact `chrome-extension://...` origin in `ALLOWED_ORIGINS`.
 - The compose button must remain preview/replace only; never invoke Gmail Send.
 - Gmail DOM selectors are best effort. If From detection fails, the UI requests a choice from backend-authorized sender addresses.
-- Changing the Gmail From selection must trigger fresh context detection and must not trigger reauthentication.
+- Changing Gmail From selection must trigger fresh context detection and must not trigger reauthentication.
 
 ## Known limitations
 
 - Gmail DOM selectors are undocumented and may need maintenance.
 - Current preview and mode/sender selection use native confirm/prompt dialogs; a production panel should replace them.
-- The extension ID is not stable across unpacked installs unless Chrome preserves the installation or a manifest key/distribution package is used.
-- Tokens are stored in `chrome.storage.local`; production hardening may move them to session storage/refresh flow.
-- Sender permissions are currently environment-configured rather than database-administered.
 - Only one recipient address is recorded even when Gmail contains multiple recipients.
-
-## Assumptions
-
-- Google OAuth web credentials can register the backend extension callback.
-- The signed-token lifetime of eight hours is acceptable for the MVP.
-- Backend configuration remains authoritative for employee and sender permission assignment.
+- TOTP is deferred to the next authentication-hardening step.
 
 ## Tests
 
-- Server TypeScript typecheck passes.
-- Server Vitest suite passes: 10 tests at last run.
+- Server typecheck, build, and 14-test Vitest suite pass.
 - Portal production build passes.
 - Extension JavaScript syntax checks pass.
-- `manifest.json` parses and declares Manifest V3.
+- Manifest V3 no longer requests Chrome’s `identity` permission.
 
 ## Potential merge conflicts
 
-- `server/src/app.ts`
-- `server/src/config.ts`
-- `server/src/index.ts`
-- `server/src/services/auth.ts`
-- `server/src/services/analyticsRepository.ts`
-- `server/prisma/schema.prisma` and migration ordering
-- `portal/src/main.tsx`
-- package manifests and lockfile
-- Railway/Google setup documentation
-
-Meeting Coach intentionally avoided these shared files; integration must use its ports rather than replacing current implementations.
+- Shared auth/config/startup files, Prisma schema/migration ordering, `portal/src/main.tsx`, package lockfile, and Railway setup docs.
+- Meeting Coach intentionally avoided these files; integration must use its ports and the canonical database user ID.
 
 ## Remaining work
 
-1. Configure production Google redirect URIs and Railway variables.
-2. Stabilize the unpacked extension ID and add it to `EXTENSION_IDS`.
-3. Apply migrations to the target database.
-4. Perform a real Gmail end-to-end test with Cylina using both permitted From addresses.
+1. Push/redeploy and apply the native-auth migration.
+2. Bootstrap the two canonical users once, then remove bootstrap variables.
+3. Configure the installed extension origin in `ALLOWED_ORIGINS`.
+4. Perform a real Gmail end-to-end test with Cylina using both permitted From addresses, refresh rotation, and logout/revocation.
 5. Replace native dialogs with the approved extension UI.
 6. Add acceptance/regeneration telemetry after UX is finalized.
-7. Decide whether sender permissions move into a canonical user/permission database model.
-8. Reconcile shared systems with Meeting Coach during final integration.
+7. Reconcile shared systems with Meeting Coach during final integration.

@@ -6,7 +6,16 @@
   "use strict";
   const BODY_SELECTOR = '[contenteditable="true"][role="textbox"]'; const PROTECTED_SELECTOR = ".gmail_signature, .gmail_quote, [data-smartmail=\"gmail_signature\"]";
   function textOf(element) { return element?.innerText?.trim() || element?.textContent?.trim() || ""; }
-  function findBody(compose) { return compose?.querySelector?.(BODY_SELECTOR) || null; }
+  function findBody(compose) {
+    const candidates = [...(compose?.querySelectorAll?.(BODY_SELECTOR) || [])];
+    return candidates.find((node) => node.getAttribute?.("g_editable") === "true") || candidates.find((node) => !/describe your message/i.test(node.getAttribute?.("aria-label") || "")) || null;
+  }
+  function composeMount(compose) {
+    const sendButton = compose?.querySelector?.('[role="button"][aria-label="Send"], [role="button"][data-tooltip^="Send"]'); const sendTable = sendButton?.closest?.("table");
+    if (sendTable?.parentElement) return { parent: sendTable.parentElement, before: sendTable };
+    const toolbars = [...(compose?.querySelectorAll?.('[role="toolbar"]') || [])]; const toolbar = toolbars.find((node) => node.parentElement && (node.parentElement.offsetWidth || node.parentElement.offsetHeight)) || toolbars[0];
+    return { parent: toolbar?.parentElement || compose, before: null };
+  }
   function draftText(body) { if (!body) return ""; const copy = body.cloneNode(true); copy.querySelectorAll?.(PROTECTED_SELECTOR).forEach((node) => node.remove()); return textOf(copy); }
   function detectSender(compose) {
     const selectors = ['input[name="from"]', '[name="from"] [email]', '[data-tooltip^="From:"]', '[aria-label^="From:"]', '[aria-label^="From "]', '[data-hovercard-id*="@"]'];
@@ -26,5 +35,5 @@
     const fragment = document.createDocumentFragment(); String(replacement).split("\n").forEach((line, index) => { if (index) fragment.append(document.createElement("br")); fragment.append(document.createTextNode(line)); }); body.insertBefore(fragment, body.firstChild); body.focus(); dispatchInput(body, String(replacement), "insertReplacementText"); return snapshot;
   }
   function restoreDraftBody(body, snapshot) { if (!body || !snapshot) return false; body.innerHTML = snapshot.html; body.focus(); dispatchInput(body, null, "historyUndo"); return true; }
-  return { BODY_SELECTOR, PROTECTED_SELECTOR, textOf, findBody, draftText, detectSender, recipientAddress, composeContext, replaceDraftBody, restoreDraftBody };
+  return { BODY_SELECTOR, PROTECTED_SELECTOR, textOf, findBody, composeMount, draftText, detectSender, recipientAddress, composeContext, replaceDraftBody, restoreDraftBody };
 });

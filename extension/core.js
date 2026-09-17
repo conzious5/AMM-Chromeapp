@@ -48,6 +48,7 @@
     if (/TIMEOUT|timed out|AbortError/i.test(value)) return { code: "TIMEOUT", message: "The request took too long. Your draft is unchanged; please try again." };
     if (/Failed to fetch|NETWORK|offline/i.test(value)) return { code: "NETWORK", message: "AMM Voice cannot reach the server. Check your connection and try again." };
     if (/MODEL/i.test(value)) return { code: "MODEL", message: "The rewrite could not be completed. Your draft is unchanged; please try again." };
+    if (/MALFORMED/i.test(value)) return { code: "MALFORMED_RESPONSE", message: "AMM Voice returned an incomplete response. Your draft is unchanged; please try again." };
     return { code: "API", message: value || "AMM Voice could not complete the request. Your draft is unchanged." };
   }
   function sanitizeTelemetry(name, metadata = {}) {

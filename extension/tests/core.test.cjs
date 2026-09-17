@@ -29,7 +29,7 @@ test("question coverage and calm warnings are UI-ready", () => {
 });
 
 test("error mapping preserves actionable recovery", () => {
-  assert.equal(core.classifyError(new Error("SIGN_IN_REQUIRED")).code, "AUTH_REQUIRED"); assert.equal(core.classifyError(new Error("429")).code, "RATE_LIMIT"); assert.match(core.classifyError(new Error("Failed to fetch")).message, /connection/);
+  assert.equal(core.classifyError(new Error("SIGN_IN_REQUIRED")).code, "AUTH_REQUIRED"); assert.equal(core.classifyError(new Error("429")).code, "RATE_LIMIT"); assert.match(core.classifyError(new Error("Failed to fetch")).message, /connection/); assert.equal(core.classifyError(new Error("MALFORMED_REWRITE_RESPONSE")).code, "MALFORMED_RESPONSE");
 });
 
 test("telemetry strips email content and accepts only conceptual events", () => {

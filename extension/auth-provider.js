@@ -6,7 +6,10 @@
   class NativeExtensionAuthProvider extends ExtensionAuthProvider {
     constructor(chromeApi, settingsReader, fetchImpl = fetch) { super(); this.chrome = chromeApi; this.settingsReader = settingsReader; this.fetch = fetchImpl; }
     async tokenState() { return this.chrome.storage.session.get(["accessToken", "refreshToken", "currentUser"]); }
-    async saveSession(value) { await this.chrome.storage.session.set({ accessToken: value.accessToken, refreshToken: value.refreshToken, currentUser: value.user }); }
+    async saveSession(value) {
+      if (!value || typeof value.accessToken !== "string" || !value.accessToken || typeof value.refreshToken !== "string" || !value.refreshToken || !value.user || typeof value.user !== "object") throw new Error("MALFORMED_AUTH_RESPONSE");
+      await this.chrome.storage.session.set({ accessToken: value.accessToken, refreshToken: value.refreshToken, currentUser: value.user });
+    }
     async clearSession() { await this.chrome.storage.session.remove(["accessToken", "refreshToken", "currentUser"]); }
     async post(path, payload, accessToken) {
       const { backendUrl } = await this.settingsReader();

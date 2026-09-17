@@ -85,7 +85,7 @@ Gmail has no stable public DOM contract. The adapter currently relies on compose
 Before packaging:
 
 - complete real Gmail tests across new compose, reply, reply all, forward, changed From, shared sender, collapsed From, and multiple windows;
-- merge the extension UI branch with canonical native-auth commit `da95707` and verify login, access-token refresh rotation, logout, and revocation end to end;
+- verify valid-user login, access-token refresh rotation, logout, and revocation end to end against the merged canonical native-auth backend;
 - stabilize the extension ID and production redirect configuration;
 - replace broad assumptions with selector fixtures captured from supported Gmail layouts;
 - add icons/store artwork, a privacy disclosure, permission rationale, support information, and release signing;
