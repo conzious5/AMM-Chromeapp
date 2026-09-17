@@ -7,7 +7,7 @@ Shared repository communication channel. Agents must append or narrowly edit the
 | Branch | Feature | Ownership/status |
 |---|---|---|
 | `main` | Core rewrite service, management portal, Google/extension authentication, Manifest V3 Gmail extension, analytics foundation | Current committed integration baseline. Extension/auth/identity work is described below. |
-| `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented and documented; not integrated into shared auth, Prisma, routes, analytics, or portal. |
+| `feature/meeting-coach` | Meeting Coach transcript analysis and coaching domain | Independently implemented with coordinated handoff at `5f44a96`; not integrated into shared auth, Prisma, routes, analytics, or portal. |
 
 ## Completed work
 
@@ -29,7 +29,7 @@ Handoff: `docs/email-extension-integration-handoff.md`.
 - Transcript parsing, speaker inference, question extraction, classification, evidence-grounded analysis, scoring, coaching reports, trends, goals, model adapter, repository/integration ports, tests, and evals.
 - No shared auth, Prisma, route, analytics repository, portal shell, or Railway changes were made on the feature branch.
 
-Authoritative handoff on branch: `docs/meeting-coach-integration.md`. Schema proposal: `docs/meeting-coach-schema-proposal.md`.
+Authoritative handoff on branch: `docs/meeting-coach-handoff.md` at `5f44a96`. Detailed integration log: `docs/meeting-coach-integration.md`. Schema proposal: `docs/meeting-coach-schema-proposal.md`.
 
 ## Canonical architecture decisions
 
@@ -203,5 +203,5 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 ## Final integration status
 
 - Email extension/auth/identity/analytics foundation: committed on `main`; configuration/deployment verification remains.
-- Meeting Coach: feature-complete on its branch at the domain/service level; shared-system integration remains.
+- Meeting Coach: feature-complete on its branch at the domain/service level with handoff commit `5f44a96`; shared-system integration remains.
 - Final reconciliation of auth, Prisma, analytics, routes, portal navigation, Railway, and Google integration has not been performed.
