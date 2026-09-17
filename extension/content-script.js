@@ -76,7 +76,7 @@
       setBusy(state, true, state.mode === "zacs_edit" ? "Analyzing the conversation…" : "Polishing your draft…"); const config = await configFor(state); state.config = config;
       const senderState = Core.resolveComposeSender(state.context.senderAddress, config.authenticatedUser, config.senderAddresses || [], state.settings.autoDetectSender); renderSender(state, senderState);
       if (senderState.needsSelection) { setBusy(state, false, senderState.options.length ? "Confirm the From address before continuing." : "No authorized sender identities are available."); state.ui.continueButton.hidden = senderState.options.length === 0; state.ui.continueButton.textContent = "Continue"; return; }
-      const payload = { mode: state.mode, draft: state.context.draft, subject: state.context.subject, thread: state.context.thread, senderAddress: state.selectedSender };
+      state.context.thread = Gmail.rewriteThreadContext(state.context, config.senderAddresses || []); const payload = { mode: state.mode, draft: state.context.draft, subject: state.context.subject, thread: state.context.thread, senderAddress: state.selectedSender };
       if (state.context.recipientAddress) payload.recipientAddress = state.context.recipientAddress; if (state.context.conversationId) payload.conversationId = state.context.conversationId; state.payload = payload;
       emit(retry ? "rewrite_retried" : state.mode === "zacs_edit" ? "zacs_edit_requested" : "amm_style_requested", { mode: state.mode, senderDetected: senderState.detected, questionCount: Core.extractQuestions(state.context.thread).length });
       renderResult(state, await call(retry ? "RETRY_REWRITE" : "REWRITE", payload));
@@ -85,7 +85,7 @@
   async function continueWithSender(state) {
     if (!state.selectedSender) { showError(state, new Error("SENDER_REQUIRED")); return; } state.errorCode = "";
     state.context = Gmail.composeContext(state.compose); setBusy(state, true, state.mode === "zacs_edit" ? "Analyzing the conversation…" : "Polishing your draft…"); state.ui.continueButton.hidden = true;
-    const payload = { mode: state.mode, draft: state.context.draft, subject: state.context.subject, thread: state.context.thread, senderAddress: state.selectedSender }; if (state.context.recipientAddress) payload.recipientAddress = state.context.recipientAddress; if (state.context.conversationId) payload.conversationId = state.context.conversationId; state.payload = payload;
+    state.context.thread = Gmail.rewriteThreadContext(state.context, state.config?.senderAddresses || []); const payload = { mode: state.mode, draft: state.context.draft, subject: state.context.subject, thread: state.context.thread, senderAddress: state.selectedSender }; if (state.context.recipientAddress) payload.recipientAddress = state.context.recipientAddress; if (state.context.conversationId) payload.conversationId = state.context.conversationId; state.payload = payload;
     try { emit(state.mode === "zacs_edit" ? "zacs_edit_requested" : "amm_style_requested", { mode: state.mode, senderDetected: false, questionCount: Core.extractQuestions(state.context.thread).length }); renderResult(state, await call("REWRITE", payload)); } catch (error) { showError(state, error); }
   }
   function closePanel(state) { if (state.busy) return; state.ui.panel.hidden = true; state.ui.result.hidden = true; state.ui.status.textContent = ""; }

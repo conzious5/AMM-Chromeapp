@@ -28,10 +28,30 @@ test("thread limiting keeps recent context within bounds", () => {
   assert.equal(output.includes("message-0"), false); assert.equal(output.includes("message-9"), true); assert.ok(output.length <= 150);
 });
 
+test("rewrite context separates the draft from bounded, relevant conversation sections", () => {
+  const messages = [
+    { senderAddress: "client@example.com", text: "Older note: the teaser timing was estimated for Friday." },
+    { senderAddress: "planner@example.com", text: "Unrelated catering menu and linen colors." },
+    { senderAddress: "hello@authentic-moments.com", text: "We are checking the teaser timeline." },
+    { senderAddress: "vendor@example.com", text: "Unrelated parking details." },
+    { senderAddress: "hello@authentic-moments.com", text: "I will confirm the teaser estimate." },
+    { senderAddress: "client@example.com", text: "Is the teaser still expected Friday?" }
+  ];
+  const thread = core.buildLabeledThreadContext(messages, { draft: "I am checking the teaser timing.", subject: "Teaser delivery", ownAddresses: ["hello@authentic-moments.com"], maxChars: 12000 });
+  assert.match(thread, /^Latest inbound:\nIs the teaser still expected Friday\?/); assert.match(thread, /Recent relevant thread:/); assert.match(thread, /Older history:/);
+  assert.match(thread, /Older note: the teaser timing/); assert.doesNotMatch(thread, /catering menu|parking details/); assert.doesNotMatch(thread, /I am checking the teaser timing\./);
+});
+
+test("rewrite context remains backward compatible and tightly bounded when Gmail cannot identify senders", () => {
+  const thread = core.buildLabeledThreadContext(["Old unrelated detail", "Current relevant delivery question"], { draft: "Delivery response", subject: "Delivery", maxChars: 55 });
+  assert.match(thread, /^Recent relevant thread:/); assert.doesNotMatch(thread, /Latest inbound:/); assert.ok(thread.length <= 55);
+});
+
 test("question coverage and calm warnings are UI-ready", () => {
   const questions = core.extractQuestions("When will the teaser be ready? Can we buy raw footage? Do you need another song?"); assert.equal(questions.length, 3);
   const coverage = core.questionCoverage(questions, "The teaser should be ready next week, and raw footage can be purchased."); assert.equal(coverage.some((item) => !item.covered), true);
   assert.match(core.warningView("UNSUPPORTED_PROMISE").message, /Potential promise/);
+  for (const warning of ["TOPIC_DRIFT", { code: "UNSUPPORTED_FACT" }, { category: "UNRELATED_THREAD_CONTEXT" }]) assert.equal(core.warningView(warning).message, "This suggestion may have added information not present in your draft. Review carefully.");
   assert.deepEqual(core.meaningfulReviewNotes(["Fixed a comma.", "The draft does not explain what happens next."]), ["The draft does not explain what happens next."]);
 });
 

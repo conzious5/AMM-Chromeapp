@@ -7,6 +7,9 @@
   const SETTINGS_DEFAULTS = Object.freeze({ defaultAction: "amm_style", showZacReview: true, autoDetectSender: true, backendEnvironment: "production" });
   const WARNING_MESSAGES = Object.freeze({
     UNSUPPORTED_PROMISE: "Potential promise: this wording may be firmer than the conversation supports.",
+    TOPIC_DRIFT: "This suggestion may have added information not present in your draft. Review carefully.",
+    UNSUPPORTED_FACT: "This suggestion may have added information not present in your draft. Review carefully.",
+    UNRELATED_THREAD_CONTEXT: "This suggestion may have added information not present in your draft. Review carefully.",
     MISSING_QUESTION: "A client question may still need an answer.",
     TIMELINE_AMBIGUITY: "The timing may not be clear enough yet.",
     POSSIBLE_CONTRADICTION: "This may conflict with something stated earlier in the conversation.",
@@ -36,8 +39,31 @@
     for (let index = candidates.length - 1; index >= 0 && remaining > 0; index -= 1) { const message = candidates[index]; if (message.length <= remaining) { selected.unshift(message); remaining -= message.length; } else if (selected.length === 0) { selected.unshift(message.slice(-remaining)); remaining = 0; } }
     return selected.join("\n\n---\n\n");
   }
+  function buildLabeledThreadContext(messages, options = {}) {
+    const maxMessages = options.maxMessages || 5; const maxChars = options.maxChars || 12000;
+    const ownAddresses = new Set((options.ownAddresses || []).map(normalizeEmail).filter(Boolean));
+    const records = (messages || []).map((item, index) => ({ text: String(typeof item === "string" ? item : item?.text || "").trim(), senderAddress: normalizeEmail(typeof item === "string" ? "" : item?.senderAddress), index })).filter((item) => item.text);
+    if (!records.length || maxMessages < 1 || maxChars < 1) return "";
+    const inbound = records.filter((item) => item.senderAddress && !ownAddresses.has(item.senderAddress)); const latestInbound = inbound.at(-1) || null;
+    const focusTokens = new Set(meaningfulTokens(`${options.subject || ""} ${options.draft || ""} ${latestInbound?.text || ""}`));
+    const relevance = (item) => meaningfulTokens(item.text).filter((token) => focusTokens.has(token)).length;
+    const remaining = records.filter((item) => item !== latestInbound); const newest = remaining.at(-1) || null;
+    const recentPool = remaining.slice(-4); const recent = recentPool.filter((item) => item === newest || relevance(item) > 0).slice(-Math.max(0, maxMessages - (latestInbound ? 1 : 0)));
+    const used = new Set([latestInbound, ...recent].filter(Boolean)); const olderCandidates = remaining.filter((item) => !used.has(item) && relevance(item) > 0).sort((a, b) => relevance(b) - relevance(a) || b.index - a.index);
+    const older = olderCandidates.slice(0, Math.max(0, maxMessages - used.size));
+    const sections = [];
+    if (latestInbound) sections.push(["Latest inbound", [latestInbound]]);
+    if (recent.length) sections.push(["Recent relevant thread", recent]);
+    if (older.length) sections.push(["Older history", older.sort((a, b) => a.index - b.index)]);
+    let output = "";
+    for (const [label, items] of sections) {
+      const block = `${label}:\n${items.map((item) => item.text).join("\n\n---\n\n")}`; const separator = output ? "\n\n" : ""; const available = maxChars - output.length - separator.length;
+      if (available <= label.length + 2) break; output += separator + block.slice(0, available);
+    }
+    return output;
+  }
   function warningView(warning) {
-    const raw = typeof warning === "string" ? warning : warning?.code || warning?.message || "Review suggested"; const code = String(raw).trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const raw = typeof warning === "string" ? warning : warning?.code || warning?.category || warning?.message || "Review suggested"; const code = String(raw).trim().toUpperCase().replace(/[\s-]+/g, "_");
     return { code: WARNING_MESSAGES[code] ? code : "REVIEW_SUGGESTED", message: WARNING_MESSAGES[code] || String(raw) };
   }
   function classifyError(error) {
@@ -64,5 +90,5 @@
   }
   function meaningfulReviewNotes(notes) { return (notes || []).map((value) => String(value || "").trim()).filter((value) => value && !/\b(grammar|spelling|punctuation|comma|capitalization|typo)\b/i.test(value)); }
   function createComposeSession(id = "") { return { id, mode: "amm_style", busy: false, selectedSender: "", output: null, payload: null, undoSnapshot: null, coachingConfig: null, coachingSendDedup: null, assistance: { ammStyleUsed: false, zacsEditUsed: false, rewriteAccepted: false, originalDraft: "", lastSuggestion: "", acceptedText: "", warningCodes: [], questionCoverageWarningDisplayed: false } }; }
-  return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, resolveComposeSender, extractQuestions, questionCoverage, limitThread, warningView, classifyError, sanitizeTelemetry, meaningfulReviewNotes, createComposeSession };
+  return { SETTINGS_DEFAULTS, WARNING_MESSAGES, normalizeEmail, resolveSender, resolveComposeSender, extractQuestions, questionCoverage, limitThread, buildLabeledThreadContext, warningView, classifyError, sanitizeTelemetry, meaningfulReviewNotes, createComposeSession };
 });

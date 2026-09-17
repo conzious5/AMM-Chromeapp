@@ -4,6 +4,17 @@
 
 Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix), `5132cb1` (v0.1.2 Gmail compose-control lifecycle recovery), `2d16e1b` (new-outbound-email coaching capture boundary), `edd37d0` (service-worker-authoritative auth restoration and safe diagnostics), `06c039d` (generalized inline Reply/Reply All/Forward compose support), and `d91aaaf` (v0.1.3 installation/release preparation). Initial handoff: `ae97860`.
 
+### Rewrite-context quality companion
+
+- **What was built:** the extension still sends the canonical `draft`, `subject`, and `thread` fields, but rewrite thread context is now organized into labeled `Latest inbound`, `Recent relevant thread`, and `Older history` sections. The existing `draft` field is the authoritative Current draft and is not duplicated inside `thread`.
+- **Selection/privacy:** Gmail sender metadata is compared only in memory with backend-authorized sender addresses to identify the latest inbound message. The remaining selection prioritizes recent messages and lexical relevance to the draft, subject, and latest inbound; unrelated older messages are omitted. Rewrite context is reduced from six messages/20,000 characters to at most five messages/12,000 characters. No content is added to storage, logs, diagnostics, or telemetry.
+- **Compatibility:** `/api/rewrite` receives no new or changed JSON fields. If Gmail does not expose sender metadata, the extension labels selected material only as `Recent relevant thread` rather than guessing which message is inbound. The separately deferred outbound-coaching payload retains its existing six-message/20,000-character limit.
+- **Review warning:** explicit backend warning code/category `TOPIC_DRIFT`, `UNSUPPORTED_FACT`, or `UNRELATED_THREAD_CONTEXT` maps to: `This suggestion may have added information not present in your draft. Review carefully.` The extension does not infer this condition or weaken the backend's responsibility to prevent unsupported content.
+- **Files changed:** `extension/core.js`, `extension/compose-adapter.js`, `extension/content-script.js`, `extension/README.md`, and `extension/tests/core.test.cjs`.
+- **Shared systems:** no auth, server route/schema, Prisma, Railway, portal, analytics, Meeting Coach, environment-variable, or outbound-coaching contract changes.
+- **Tests:** focused coverage verifies labeled relevant selection, omission of unrelated history/current-draft duplication, no guessed inbound label when sender metadata is unavailable, strict character bounds, and all three warning code/category mappings.
+- **Remaining work:** include this extension-only change in a future beta rather than replacing v0.1.3, then manually inspect privacy-safe request shape and warning rendering in installed Chrome with a backend response carrying one of the explicit codes.
+
 ### Email Communication Coaching — extension capture boundary
 
 #### What was built
@@ -141,7 +152,7 @@ The access token, not the request body, identifies `authenticatedUser`. The back
 - Meaningful Zac Review notes, calm backend warning display, and conditional client-question coverage.
 - Independent `WeakMap`-backed state per Gmail compose window.
 - From-address detection with fail-closed authorized sender selection.
-- Six-message / 20,000-character thread context limits.
+- Rewrite context limited to five selected messages / 12,000 characters, organized as latest inbound, recent relevant thread, and relevant older history; outbound coaching retains its separate six-message / 20,000-character boundary.
 - Replacement limited to draft content before Gmail signature/quote nodes; exact immediate HTML snapshot for Undo.
 - Explicit loading and recovery messages for auth, sender, draft, network, timeout, rate-limit, model, and API failures.
 - Keyboard focus styles, ARIA labels/live regions, Escape dismissal, readable contrast, reduced-motion support, and responsive sizing.

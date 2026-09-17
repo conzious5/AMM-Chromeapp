@@ -31,8 +31,8 @@ AMM Voice attempts to read the current Gmail From address for new compose, reply
 
 ## Context and privacy
 
-- At most the six most recent visible Gmail message bodies are considered.
-- Thread context is capped at 20,000 characters.
+- Rewrite requests keep the current draft in the canonical `draft` field and organize prior conversation into `Latest inbound`, `Recent relevant thread`, and `Older history` sections inside the canonical `thread` field.
+- At most five visible Gmail message bodies are selected using recency and draft/subject relevance, and thread context is capped at 12,000 characters.
 - Expensive work runs only after an explicit AMM Style or Zac's Edit click.
 - Drafts and complete threads are not written to extension storage or telemetry.
 - Telemetry is behind an interface and accepts only conceptual event names plus allowlisted scalar metadata.

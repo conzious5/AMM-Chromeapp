@@ -61,11 +61,19 @@
     return [...new Set(addresses)];
   }
   function recipientAddress(compose) { return recipientAddresses(compose)[0] || ""; }
-  function threadMessages(documentRef, body) { const nodes = [...documentRef.querySelectorAll(".a3s.aiL, [data-message-id] .a3s")]; return nodes.filter((node) => node !== body && !body?.contains?.(node) && !node.contains?.(body)).map(textOf); }
+  function threadMessages(documentRef, body) {
+    const nodes = [...documentRef.querySelectorAll(".a3s.aiL, [data-message-id] .a3s")];
+    return nodes.filter((node) => node !== body && !body?.contains?.(node) && !node.contains?.(body)).map((node) => {
+      const message = node.closest?.('[data-message-id], .adn'); const sender = message?.querySelector?.('.gD[email], .gD[data-hovercard-id*="@"]');
+      return { text: textOf(node), senderAddress: core.normalizeEmail(sender?.getAttribute?.("email") || sender?.getAttribute?.("data-hovercard-id") || "") };
+    });
+  }
+  function rewriteThreadContext(context, ownAddresses = []) { return core.buildLabeledThreadContext(context?.threadMessages || [], { draft: context?.draft, subject: context?.subject, ownAddresses, maxMessages: 5, maxChars: 12000 }); }
   function composeContext(compose, documentRef = document) {
     const body = findBody(compose); const subject = compose.querySelector('input[name="subjectbox"]')?.value || documentRef.querySelector("h2.hP")?.textContent?.trim() || "";
     const hash = documentRef?.location?.hash || (typeof location !== "undefined" ? location.hash : ""); const conversationId = hash.match(/[a-f0-9]{16,}/i)?.[0] || compose.getAttribute("data-thread-perm-id") || "";
-    return { body, subject, draft: draftText(body), recipientAddress: recipientAddress(compose), senderAddress: detectSender(compose), thread: core.limitThread(threadMessages(documentRef, body), { maxMessages: 6, maxChars: 20000 }), conversationId };
+    const context = { body, subject, draft: draftText(body), recipientAddress: recipientAddress(compose), senderAddress: detectSender(compose), threadMessages: threadMessages(documentRef, body), conversationId };
+    context.thread = rewriteThreadContext(context); return context;
   }
   function composeMode(compose, subject = "") {
     const label = [compose?.getAttribute?.("aria-label"), compose?.querySelector?.("h2")?.textContent, subject].filter(Boolean).join(" ");
@@ -78,7 +86,7 @@
     const context = composeContext(compose, documentRef); const recipients = recipientAddresses(compose);
     return { root: compose, mode: composeMode(compose, context.subject), getBody: () => findBody(compose), getSubject: () => composeContext(compose, documentRef).subject, getSender: () => detectSender(compose), getRecipients: () => recipientAddresses(compose), getThreadContext: () => composeContext(compose, documentRef).thread, getToolbarAnchor: () => composeMount(compose), replaceDraft: (replacement) => replaceDraftBody(findBody(compose), replacement), restoreDraft: (snapshot) => restoreDraftBody(findBody(compose), snapshot), context, recipients };
   }
-  function outboundContext(compose, documentRef = document) { const adapter = composeAdapter(compose, documentRef); const context = adapter.context; return { composeId: composeIdentity(compose), composeMode: adapter.mode, senderAddress: context.senderAddress, recipientAddresses: adapter.recipients, subject: context.subject, finalBody: context.draft, threadContext: context.thread, conversationRef: context.conversationId }; }
+  function outboundContext(compose, documentRef = document) { const adapter = composeAdapter(compose, documentRef); const context = adapter.context; return { composeId: composeIdentity(compose), composeMode: adapter.mode, senderAddress: context.senderAddress, recipientAddresses: adapter.recipients, subject: context.subject, finalBody: context.draft, threadContext: core.limitThread(context.threadMessages.map((item) => item.text), { maxMessages: 6, maxChars: 20000 }), conversationRef: context.conversationId }; }
   function isSendControl(target, compose) { const control = target?.closest?.('[role="button"], button'); if (!control || !compose?.contains?.(control) || control.closest?.(".amm-voice-shell")) return false; const label = [control.getAttribute?.("aria-label"), control.getAttribute?.("data-tooltip"), textOf(control)].filter(Boolean).join(" ").trim(); return /^send(?:\s|$|\()/i.test(label) && !/^send\s+(later|options)/i.test(label) && !/more send options/i.test(label); }
   function dispatchInput(body, text, inputType) { body.dispatchEvent(new InputEvent("input", { bubbles: true, inputType, data: text })); }
   function replaceDraftBody(body, replacement) {
@@ -86,5 +94,5 @@
     const fragment = document.createDocumentFragment(); String(replacement).split("\n").forEach((line, index) => { if (index) fragment.append(document.createElement("br")); fragment.append(document.createTextNode(line)); }); body.insertBefore(fragment, body.firstChild); body.focus(); dispatchInput(body, String(replacement), "insertReplacementText"); return snapshot;
   }
   function restoreDraftBody(body, snapshot) { if (!body || !snapshot) return false; body.innerHTML = snapshot.html; body.focus(); dispatchInput(body, null, "historyUndo"); return true; }
-  return { BODY_SELECTOR, PROTECTED_SELECTOR, COMPOSE_BOUNDARY_SELECTOR, COMPOSE_MODES, textOf, findBody, isComposeBody, hasSendControl, composeRootForBody, composeRootForNode, findComposeRoots, composeMount, composeIdentity, ensureComposeIdentity, draftText, detectSender, recipientAddresses, recipientAddress, composeMode, composeAdapter, composeContext, outboundContext, isSendControl, replaceDraftBody, restoreDraftBody };
+  return { BODY_SELECTOR, PROTECTED_SELECTOR, COMPOSE_BOUNDARY_SELECTOR, COMPOSE_MODES, textOf, findBody, isComposeBody, hasSendControl, composeRootForBody, composeRootForNode, findComposeRoots, composeMount, composeIdentity, ensureComposeIdentity, draftText, detectSender, recipientAddresses, recipientAddress, rewriteThreadContext, composeMode, composeAdapter, composeContext, outboundContext, isSendControl, replaceDraftBody, restoreDraftBody };
 });
