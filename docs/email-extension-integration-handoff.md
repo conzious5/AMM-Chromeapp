@@ -15,6 +15,8 @@ Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e
 - Regression coverage reproduces a receiver-sensitive WorkerGlobalScope fetch, verifies both native-auth and protected API requests, exactly one refresh attempt, rejected-refresh expiration, generic exception preservation, and failure-only draft safety.
 - Production transport smoke tests reached `/api/rewrite` for both `amm_style` and `zacs_edit` and received the expected HTTP 401 for an intentionally invalid bearer token. Authenticated production rewriting remains a manual installed-beta retest.
 - Extension version advanced to `0.1.1`; v0.1.0-beta remains immutable.
+- GitHub prerelease: `https://github.com/conzious5/AMM-Chromeapp/releases/tag/v0.1.1-beta`; direct asset: `https://github.com/conzious5/AMM-Chromeapp/releases/download/v0.1.1-beta/AMM-Voice-Beta-v0.1.1.zip`.
+- Published asset SHA-256: `7049e2e9898619bd2972ad47c829030c2fa113a6ae8ee6b48b32b5a2158b83a1`; downloaded GitHub asset matched the validated local ZIP byte-for-byte.
 
 - Merged canonical `main` through production-auth deployment documentation `e06498d`; shared server, Prisma, Railway, portal, and analytics implementations were accepted unchanged.
 - Production health returned HTTP 200 and the native login UI rendered at `https://ammserver-production.up.railway.app`.
