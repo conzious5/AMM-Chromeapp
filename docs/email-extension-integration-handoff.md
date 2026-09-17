@@ -2,7 +2,7 @@
 
 ## Extension experience continuation — `feature/extension-experience`
 
-Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), and `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation). Initial handoff: `ae97860`.
+Implementation commits: `657c95f` (domain adapters, tests, and fixtures), `6eb8e9e` (accessible multi-compose UI, settings, and harness), `2ebc687` (extension-side adapter for canonical native auth `da95707`), `afc8f45` (meaningful-only Zac Review filtering), `1b75312` (merge canonical native auth, harden beta behavior, package/install preparation), and `34bb946` (v0.1.1 receiver-safe service-worker fetch hotfix). Initial handoff: `ae97860`.
 
 ### Beta validation continuation
 
