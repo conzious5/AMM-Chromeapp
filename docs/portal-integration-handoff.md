@@ -17,6 +17,8 @@
 
 - `406c5a6` — Add secure management portal and extension authentication.
 - `d6748a2` — Approve production dependency builds.
+- `2a1b2ca` — Generate the Prisma client inside the final deployed runtime image.
+- `5cf7526` — Trigger the watched Railway rebuild containing the runtime-image fix.
 
 ## Files added
 
@@ -43,6 +45,8 @@
 ## Database requirements
 
 Railway PostgreSQL with committed Prisma migrations applied in order.
+
+Production status: PostgreSQL is provisioned and connected through `DATABASE_URL`. Railway's pre-deploy command runs `node node_modules/prisma/build/index.js migrate deploy --schema prisma/schema.prisma`. Both committed migrations are applied and the seven expected application/migration tables were verified in Railway.
 
 ## Authentication requirements
 
@@ -75,6 +79,7 @@ The current shell uses a section-state switch rather than a full router. New fea
 - User/sender filters are available at the API but do not yet have portal filter controls.
 - Attention signals need a production ingestion/classification path.
 - No canonical database user/permission administration UI exists.
+- Production Google OAuth is not configured yet, so the deployed login button remains disabled and `/auth/me` returns `oauthReady: false`.
 
 ## Assumptions
 
@@ -84,13 +89,21 @@ The portal and API share a Railway service and public origin. Management users a
 
 Portal TypeScript compilation and Vite production build pass. Server route/auth tests pass as part of the 10-test Vitest suite.
 
+Production verification on 2026-09-16:
+
+- `https://ammserver-production.up.railway.app/health` returned `{"status":"ok"}`.
+- The public root served the built AMM Voice portal HTML and assets.
+- The Railway application and PostgreSQL services both reported Online.
+- Prisma migration tables and all six portal data tables were present.
+
 ## Potential merge conflicts
 
 `portal/src/main.tsx`, portal styles/navigation, `server/src/app.ts`, auth/analytics services, Prisma schema/migrations, Docker/build scripts, and lockfile.
 
 ## Remaining work
 
-- Deploy/configure Google OAuth and PostgreSQL.
+- Configure `PUBLIC_BASE_URL`, a production `SESSION_SECRET`, Google OAuth credentials, and the approved `ADMIN_EMAILS` / `TEAM_EMAILS` values in Railway.
+- Register `https://ammserver-production.up.railway.app/auth/google/callback` in the Google OAuth web client and run a real approved/denied-account login test.
 - Add portal filter controls for human user and sender address.
 - Replace placeholder pages with production data views.
 - Integrate Meeting Coach through its view-model and service ports after shared-system reconciliation.

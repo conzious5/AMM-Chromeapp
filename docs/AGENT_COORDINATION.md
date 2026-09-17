@@ -24,6 +24,13 @@ Shared repository communication channel. Agents must append or narrowly edit the
 
 Handoff: `docs/email-extension-integration-handoff.md`.
 
+### Management portal deployment — owner: main / commits `406c5a6`, `2a1b2ca`, `5cf7526`
+
+- Portal/API is deployed at `https://ammserver-production.up.railway.app` and the public health and HTML entry points are verified.
+- Railway PostgreSQL is provisioned, referenced by the application as `DATABASE_URL`, and both committed Prisma migrations are applied. Verified tables: `_prisma_migrations`, `AnalyticsEvent`, `AuditEvent`, `ConversationSignal`, `ProfileVersion`, `Report`, and `TrainingCandidate`.
+- Railway runs `prisma migrate deploy` as a pre-deploy command. The Docker runtime generation fix in `2a1b2ca` is required so the packaged Prisma client is initialized after workspace deployment.
+- Google OAuth is intentionally still unavailable in production until Zac supplies/approves the OAuth web client and exact admin/team email allowlists. The login page reports this as an unconfigured state rather than bypassing authentication.
+
 ### Meeting Coach — owner: `feature/meeting-coach`
 
 - Transcript parsing, speaker inference, question extraction, classification, evidence-grounded analysis, scoring, coaching reports, trends, goals, model adapter, repository/integration ports, tests, and evals.
@@ -199,9 +206,11 @@ Record a `CONFLICT` entry here if incompatible concrete implementations appear. 
 - Transcript retention/deletion policy.
 - Whether sender permissions remain environment-managed for MVP or move immediately into database administration UI.
 - Final production domain and managed-extension distribution timing.
+- Exact `ADMIN_EMAILS` and `TEAM_EMAILS` allowlists for the live portal.
+- Google OAuth web client credentials with the production portal and extension callbacks registered.
 
 ## Final integration status
 
-- Email extension/auth/identity/analytics foundation: committed on `main`; configuration/deployment verification remains.
+- Email extension/auth/identity/analytics foundation: committed on `main`; portal/API and PostgreSQL deployment are verified. Production Google OAuth, email allowlists, session secret, and extension-ID configuration remain.
 - Meeting Coach: feature-complete on its branch at the domain/service level with handoff commit `5f44a96`; shared-system integration remains.
 - Final reconciliation of auth, Prisma, analytics, routes, portal navigation, Railway, and Google integration has not been performed.
